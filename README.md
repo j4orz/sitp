@@ -1,3 +1,9 @@
+- this repo is archived.
+  - videos are still useful conceptually
+  - but implementations contain bugs (not fuzzed)
+- checkout picoprob for dsa implemented in rust
+  - this will be actively maintained to support cp
+
 # iruka
 ![](https://i.imgur.com/q6N56c9.png)
 
