@@ -1,28 +1,38 @@
 use pyo3::prelude::*;
 // pub mod nn;
 
-enum Layout {
-    Strided,
-}
+// TODO
+// - strides
+// - broadcasting
+// - algebraic ops (+, *)
+// - transcendetal ops
 
-enum Device {
-    Cpu,
-    Cuda,
-}
-
+#[derive(Clone, Debug)]
 struct Tensor {
     // logical
     shape: Vec<usize>,
     stride: Vec<usize>,
-    offset: bool,
-    grad: Box<Tensor>,
+    // offset: bool,
+    // grad: Box<Tensor>,
 
     // physical
-    layout: Layout,
     device: Device,
-    data: bool,
-    dtype: bool,
+    layout: Layout,
+    data: Vec<f32>, // picograd fixed on fp32 to bootstrap
+    dtype: Dtype,
 }
+
+#[rustfmt::skip]
+#[derive(Clone, Debug)]
+enum Device { Cpu, Cuda, Mps }
+
+#[rustfmt::skip]
+#[derive(Clone, Debug)]
+enum Layout { Strided  } // Sparse, // MklDnn
+
+#[rustfmt::skip]
+#[derive(Clone, Debug)]
+enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64 }
 
 fn tensor(input: Vec<usize>) -> Tensor {
     Tensor::new()
@@ -33,7 +43,18 @@ impl Tensor {
         todo!()
     }
 
-    fn randn() -> Self {
+    /// randn eturns a tensor filled with random numbers from a normal distribution
+    /// with mean 0 and variance 1 (also called the standard normal distribution).
+    ///
+    /// Example
+    /// ```rust
+    /// let x = Tensor::randn(4)
+    /// println!("{:?}", x)
+    ///
+    /// let W = Tensor::randn(2, 3)
+    /// println!("{:?}", W)
+    /// ```
+    fn randn(size: (i32, i32)) -> Self {
         todo!()
     }
 
