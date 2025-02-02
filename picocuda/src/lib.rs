@@ -105,6 +105,23 @@ impl Tensor {
         }
     }
 
+    /// returns a new tensor with the same data as the self tensor but of a different shape.
+    ///
+    /// The returned tensor shares the same data and must have the same number of elements, but may have a different size.
+    /// For a tensor to be viewed, the new view size must be compatible with its original size and stride
+    /// i.e., each new view dimension must either be a subspace of an original dimension, or only span across original dimensions
+    ///
+    /// Examples
+    /// ```rust
+    /// let x = Tensor::randn(&[2, 3]);
+    /// assert_eq!(x.shape, vec![2, 3]);
+    ///
+    /// let y = x.view(16);
+    /// assert_eq!(y.shape, vec![16]);
+    ///
+    /// let z = y.view(&[-1, 8]);
+    /// assert_eq!(z.shape, vec![2, 8]);
+    /// ```
     fn view(&self) -> Self {
         todo!()
     }
