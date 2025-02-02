@@ -1,3 +1,5 @@
+use std::ops::{Index, IndexMut};
+
 use pyo3::prelude::*;
 // pub mod nn;
 
@@ -6,6 +8,7 @@ use pyo3::prelude::*;
 // - broadcasting
 // - algebraic ops (+, *)
 // - transcendetal ops
+// - fuzzer
 
 #[derive(Clone, Debug)]
 struct Tensor {
@@ -18,8 +21,8 @@ struct Tensor {
     // physical
     device: Device,
     layout: Layout,
-    data: Vec<f32>, // picograd fixed on fp32 to bootstrap
     dtype: Dtype,
+    data: Vec<f32>, // picograd fixed on fp32 to bootstrap
 }
 
 #[rustfmt::skip]
@@ -43,35 +46,93 @@ impl Tensor {
         todo!()
     }
 
-    /// randn eturns a tensor filled with random numbers from a normal distribution
-    /// with mean 0 and variance 1 (also called the standard normal distribution).
+    /// randn returns a tensor filled with random numbers from a normal distribution
+    /// with mean 0 and variance 1 (also called the standard normal distribution)
     ///
-    /// Example
+    /// Examples
     /// ```rust
-    /// let x = Tensor::randn(4)
-    /// println!("{:?}", x)
+    /// let x = Tensor::randn(4);
+    /// println!("{:?}", x);
     ///
-    /// let W = Tensor::randn(2, 3)
-    /// println!("{:?}", W)
+    /// let y = Tensor::randn(&[2, 3]);
+    /// println!("{:?}", y);
     /// ```
-    fn randn(size: (i32, i32)) -> Self {
+    fn randn(shape: &[usize]) -> Self {
         todo!()
     }
 
-    fn zeros() -> Self {
+    /// returns a tensor filled with the scalar value 0, with the shape defined by the variable argument size
+    ///
+    /// Examples
+    /// ```rust
+    /// let x = Tensor::zeros(&[2, 3]);
+    /// println!("{:?}", x);
+    ///
+    /// let y = Tensor::zeros(5);
+    /// println!("{:?}", y);
+    /// ```
+    fn zeros(shape: &[usize]) -> Self {
+        let size: usize = shape.iter().sum::<usize>();
+        Tensor {
+            shape: shape.to_owned(),
+            stride: todo!(),
+            device: Device::Cpu,
+            layout: Layout::Strided,
+            dtype: Dtype::Float32,
+            data: vec![0.0; size],
+        }
+    }
+
+    /// returns a tensor filled with the scalar value 1, with the shape defined by the variable argument size
+    ///
+    /// Examples
+    /// ```rust
+    /// let x = Tensor::ones(&[2, 3]);
+    /// println!("{:?}", x);
+    ///
+    /// let y = Tensor::ones(5);
+    /// println!("{:?}", y);
+    /// ```
+    fn ones(shape: &[usize]) -> Self {
+        let size = shape.iter().sum::<usize>();
+        Tensor {
+            shape: shape.to_owned(),
+            stride: todo!(),
+            device: Device::Cpu,
+            layout: Layout::Strided,
+            dtype: Dtype::Float32,
+            data: vec![1.0; size],
+        }
+    }
+
+    fn view(&self) -> Self {
         todo!()
     }
 
-    fn ones() -> Self {
+    fn permute(&self) -> Self {
         todo!()
     }
 
     fn reshape(&self) -> Self {
         todo!()
     }
+}
 
-    fn view(&self) -> Self {
-        todo!()
+impl Index<(usize, usize)> for Tensor {
+    type Output = f32; // fixed to fp32 for now
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        let (i, j) = index;
+        let idx = i * self.shape[1] + j; // Row-major ordering
+        &self.data[idx]
+    }
+}
+
+impl IndexMut<(usize, usize)> for Tensor {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        let (i, j) = index;
+        let idx = i * self.shape[1] + j; // Row-major ordering
+        &mut self.data[idx]
     }
 }
 
