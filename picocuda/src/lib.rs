@@ -1,6 +1,11 @@
-use std::ops::{Index, IndexMut};
-
 use pyo3::prelude::*;
+use rand::distr::StandardUniform;
+use rand::Rng;
+use std::{
+    fmt::{self, Display},
+    ops::{Index, IndexMut},
+};
+
 // pub mod nn;
 
 // TODO
@@ -9,21 +14,6 @@ use pyo3::prelude::*;
 // - algebraic ops (+, *)
 // - transcendetal ops
 // - fuzzer
-
-#[derive(Clone, Debug)]
-struct Tensor {
-    // logical
-    shape: Vec<usize>,
-    stride: Vec<usize>,
-    // offset: bool,
-    // grad: Box<Tensor>,
-
-    // physical
-    device: Device,
-    layout: Layout,
-    dtype: Dtype,
-    data: Vec<f32>, // picograd fixed on fp32 to bootstrap
-}
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
@@ -37,12 +27,33 @@ enum Layout { Strided  } // Sparse, // MklDnn
 #[derive(Clone, Debug)]
 enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64 }
 
+#[derive(Clone, Debug)]
+pub struct Tensor {
+    // logical
+    shape: Vec<usize>,
+    stride: bool,
+    // offset: bool,
+    // grad: Box<Tensor>,
+
+    // physical
+    device: Device,
+    layout: Layout,
+    dtype: Dtype,
+    data: Vec<f32>, // picograd fixed on fp32 to bootstrap
+}
+
+impl Display for Tensor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.data)
+    }
+}
+
 fn tensor(input: Vec<usize>) -> Tensor {
     Tensor::new()
 }
 
 impl Tensor {
-    fn new() -> Self {
+    pub fn new() -> Self {
         todo!()
     }
 
@@ -57,8 +68,20 @@ impl Tensor {
     /// let y = Tensor::randn(&[2, 3]);
     /// println!("{:?}", y);
     /// ```
-    fn randn(shape: &[usize]) -> Self {
-        todo!()
+    pub fn randn(shape: &[usize]) -> Self {
+        let size: usize = shape.iter().sum::<usize>();
+        let data = (0..size)
+            .map(|_| rand::rng().sample(StandardUniform))
+            .collect::<Vec<f32>>();
+
+        Tensor {
+            shape: shape.to_owned(),
+            stride: false,
+            device: Device::Cpu,
+            layout: Layout::Strided,
+            dtype: Dtype::Float32,
+            data,
+        }
     }
 
     /// returns a tensor filled with the scalar value 0, with the shape defined by the variable argument size
@@ -71,7 +94,7 @@ impl Tensor {
     /// let y = Tensor::zeros(5);
     /// println!("{:?}", y);
     /// ```
-    fn zeros(shape: &[usize]) -> Self {
+    pub fn zeros(shape: &[usize]) -> Self {
         let size: usize = shape.iter().sum::<usize>();
         Tensor {
             shape: shape.to_owned(),
@@ -93,7 +116,7 @@ impl Tensor {
     /// let y = Tensor::ones(5);
     /// println!("{:?}", y);
     /// ```
-    fn ones(shape: &[usize]) -> Self {
+    pub fn ones(shape: &[usize]) -> Self {
         let size = shape.iter().sum::<usize>();
         Tensor {
             shape: shape.to_owned(),
@@ -122,15 +145,15 @@ impl Tensor {
     /// let z = y.view(&[-1, 8]);
     /// assert_eq!(z.shape, vec![2, 8]);
     /// ```
-    fn view(&self) -> Self {
+    pub fn view(&self) -> Self {
         todo!()
     }
 
-    fn permute(&self) -> Self {
+    pub fn permute(&self) -> Self {
         todo!()
     }
 
-    fn reshape(&self) -> Self {
+    pub fn reshape(&self) -> Self {
         todo!()
     }
 }
