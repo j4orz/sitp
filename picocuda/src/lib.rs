@@ -224,7 +224,7 @@ impl Tensor {
 // *****************************************************************************************************************
 
 impl Tensor {
-    fn backward(mut self) -> Self {
+    pub fn backward(mut self) -> Self {
         if self.grad.is_none() {
             let grad_tensor = Tensor {
                 shape: self.shape.clone(),
@@ -246,18 +246,10 @@ impl Tensor {
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
 enum Op {
-    Add(Box<Tensor>, Box<Tensor>),
-    Sub(Box<Tensor>, Box<Tensor>),
-    Mul(Box<Tensor>, Box<Tensor>),
-    Div(Box<Tensor>, Box<Tensor>),
-    Sin(Box<Tensor>),
-    Cos(Box<Tensor>),
-    Exp(Box<Tensor>),
-    Log(Box<Tensor>),
-    Matmul(Box<Tensor>, Box<Tensor>),
-    Tanh(Box<Tensor>),
-    Mean(Box<Tensor>),
-    Var(Box<Tensor>),
+    Add(Box<Tensor>, Box<Tensor>), Sub(Box<Tensor>, Box<Tensor>), Mul(Box<Tensor>, Box<Tensor>), Div(Box<Tensor>, Box<Tensor>), // algebraic
+    Sin(Box<Tensor>), Cos(Box<Tensor>), Exp(Box<Tensor>), Log(Box<Tensor>), // transcendental
+    Matmul(Box<Tensor>, Box<Tensor>), Tanh(Box<Tensor>), // linear/nonlinear
+    Mean(Box<Tensor>), Var(Box<Tensor>), // statistics
 }
 
 impl Op {
