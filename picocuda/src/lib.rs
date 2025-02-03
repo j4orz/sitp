@@ -3,7 +3,7 @@ use rand::distr::StandardUniform;
 use rand::Rng;
 use std::{
     fmt::{self, Display},
-    ops::{Index, IndexMut},
+    ops::{Add, Div, Index, IndexMut, Mul, Sub},
 };
 
 // pub mod nn;
@@ -11,7 +11,6 @@ use std::{
 // TODO
 // - strides (read/write)
 // - algebraic/transcendental ops (+, *, sin, cos, exp, log, etc.)
-// - broadcasting
 // - autograd
 // - fuzzer
 
@@ -211,6 +210,76 @@ impl Tensor {
             }
             _ => panic!(),
         }
+    }
+}
+
+// *****************************************************************************************************************
+// ************************************************** OPERATIONS ***************************************************
+// *****************************************************************************************************************
+
+impl Add for Tensor {
+    type Output = Tensor;
+
+    fn add(self, other: Tensor) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Sub for Tensor {
+    type Output = Tensor;
+
+    fn sub(self, other: Tensor) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Mul for Tensor {
+    type Output = Tensor;
+
+    fn mul(self, other: Tensor) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Div for Tensor {
+    type Output = Tensor;
+
+    fn div(self, other: Tensor) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Tensor {
+    pub fn matmul(&self, other: &Tensor) -> Tensor {
+        todo!()
+    }
+
+    pub fn sin(&self) -> Tensor {
+        todo!()
+    }
+
+    pub fn cos(&self) -> Tensor {
+        todo!()
+    }
+
+    pub fn exp(&self) -> Tensor {
+        todo!()
+    }
+
+    pub fn log(&self) -> Tensor {
+        todo!()
+    }
+
+    pub fn tanh(&self) -> Tensor {
+        todo!()
+    }
+
+    pub fn mean(&self) -> Tensor {
+        todo!()
+    }
+
+    pub fn var(&self) -> Tensor {
+        todo!()
     }
 }
 

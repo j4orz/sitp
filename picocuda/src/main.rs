@@ -19,6 +19,14 @@ fn main() {
     println!("{:?}", x);
     println!("{}", x);
 
+    let y = Tensor::randn(&[4, 4]);
+    println!("{:?}", y);
+    println!("{}", y);
+
+    let z = x + y;
+    // println!("{:?}", z);
+    // println!("{}", z);
+
     // let y = x.view(&[16]);
     // println!("{}", y);
 
