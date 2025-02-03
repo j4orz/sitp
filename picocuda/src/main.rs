@@ -15,6 +15,13 @@ fn main() {
     "
     );
 
-    let x = Tensor::randn(&[2, 3]);
+    let x = Tensor::randn(&[4, 4]);
+    println!("{:?}", x);
     println!("{}", x);
+
+    // let y = x.view(&[16]);
+    // println!("{}", y);
+
+    // let z = y.view(&[-1, 8]);
+    // println!("{}", z);
 }

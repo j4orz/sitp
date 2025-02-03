@@ -9,10 +9,10 @@ use std::{
 // pub mod nn;
 
 // TODO
-// - strides
+// - strides (read/write)
+// - algebraic/transcendental ops (+, *, sin, cos, exp, log, etc.)
 // - broadcasting
-// - algebraic ops (+, *)
-// - transcendetal ops
+// - autograd
 // - fuzzer
 
 #[rustfmt::skip]
@@ -31,7 +31,7 @@ enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64 }
 pub struct Tensor {
     // logical
     shape: Vec<usize>,
-    stride: bool,
+    stride: Vec<usize>,
     // offset: bool,
     // grad: Box<Tensor>,
 
@@ -42,9 +42,10 @@ pub struct Tensor {
     data: Vec<f32>, // picograd fixed on fp32 to bootstrap
 }
 
+// TODO: impl .item() for pythonic pytorch api?
 impl Display for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.data)
+        self.format(f, &self.shape, &self.stride, 0)
     }
 }
 
@@ -53,6 +54,26 @@ fn tensor(input: Vec<usize>) -> Tensor {
 }
 
 impl Tensor {
+    // *****************************************************************************************************************
+    // ************************************************** ALLOCATORS ***************************************************
+    // *****************************************************************************************************************
+
+    fn stride(shape: &[usize]) -> Vec<usize> {
+        let stride = shape
+            .iter()
+            .rev()
+            .fold((vec![], 1), |(mut strides, acc), &dim| {
+                strides.push(acc);
+                (strides, acc * dim)
+            })
+            .0
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>();
+
+        stride
+    }
+
     pub fn new() -> Self {
         todo!()
     }
@@ -69,14 +90,14 @@ impl Tensor {
     /// println!("{:?}", y);
     /// ```
     pub fn randn(shape: &[usize]) -> Self {
-        let size: usize = shape.iter().sum::<usize>();
+        let size: usize = shape.iter().product::<usize>();
         let data = (0..size)
             .map(|_| rand::rng().sample(StandardUniform))
             .collect::<Vec<f32>>();
 
         Tensor {
             shape: shape.to_owned(),
-            stride: false,
+            stride: Self::stride(shape),
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -95,10 +116,10 @@ impl Tensor {
     /// println!("{:?}", y);
     /// ```
     pub fn zeros(shape: &[usize]) -> Self {
-        let size: usize = shape.iter().sum::<usize>();
+        let size: usize = shape.iter().product::<usize>();
         Tensor {
             shape: shape.to_owned(),
-            stride: todo!(),
+            stride: Self::stride(shape),
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -117,16 +138,20 @@ impl Tensor {
     /// println!("{:?}", y);
     /// ```
     pub fn ones(shape: &[usize]) -> Self {
-        let size = shape.iter().sum::<usize>();
+        let size = shape.iter().product::<usize>();
         Tensor {
             shape: shape.to_owned(),
-            stride: todo!(),
+            stride: Self::stride(shape),
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
             data: vec![1.0; size],
         }
     }
+
+    // *****************************************************************************************************************
+    // ************************************************** VIEWS ***************************************************
+    // *****************************************************************************************************************
 
     /// returns a new tensor with the same data as the self tensor but of a different shape.
     ///
@@ -136,16 +161,11 @@ impl Tensor {
     ///
     /// Examples
     /// ```rust
-    /// let x = Tensor::randn(&[2, 3]);
-    /// assert_eq!(x.shape, vec![2, 3]);
-    ///
-    /// let y = x.view(16);
-    /// assert_eq!(y.shape, vec![16]);
-    ///
+    /// let x = Tensor::randn(&[4, 4]);
+    /// let y = x.view(&[16]);
     /// let z = y.view(&[-1, 8]);
-    /// assert_eq!(z.shape, vec![2, 8]);
     /// ```
-    pub fn view(&self) -> Self {
+    pub fn view(&self, shape: &[i32]) -> Self {
         todo!()
     }
 
@@ -156,25 +176,61 @@ impl Tensor {
     pub fn reshape(&self) -> Self {
         todo!()
     }
-}
 
-impl Index<(usize, usize)> for Tensor {
-    type Output = f32; // fixed to fp32 for now
-
-    fn index(&self, index: (usize, usize)) -> &Self::Output {
-        let (i, j) = index;
-        let idx = i * self.shape[1] + j; // Row-major ordering
-        &self.data[idx]
+    // *****************************************************************************************************************
+    // ************************************************** HELPERS ***************************************************
+    // *****************************************************************************************************************
+    fn format(
+        &self,
+        fmt: &mut fmt::Formatter<'_>,
+        shape: &[usize],
+        stride: &[usize],
+        offset: usize,
+    ) -> fmt::Result {
+        match (shape, stride) {
+            ([], []) => {
+                write!(fmt, "{:.4}", self.data[offset])?;
+                Ok(())
+            }
+            // basecase: indexed ndarray all the way through
+            // ([_dimf], [_stridef]) => {
+            //     write!(fmt, "{:.4}", self.data[offset])?;
+            //     Ok(())
+            // }
+            ([D, dimr @ ..], [stridef, strider @ ..]) => {
+                write!(fmt, "[")?;
+                for d in 0..*D {
+                    // rolling out dimf
+                    self.format(fmt, dimr, strider, offset + stridef * d)?;
+                    if d != *D - 1 {
+                        write!(fmt, ", ")?;
+                    }
+                }
+                write!(fmt, "]\n")?;
+                Ok(())
+            }
+            _ => panic!(),
+        }
     }
 }
 
-impl IndexMut<(usize, usize)> for Tensor {
-    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        let (i, j) = index;
-        let idx = i * self.shape[1] + j; // Row-major ordering
-        &mut self.data[idx]
-    }
-}
+// impl Index<(usize, usize)> for Tensor {
+//     type Output = f32; // fixed to fp32 for now
+
+//     fn index(&self, index: (usize, usize)) -> &Self::Output {
+//         let (i, j) = index;
+//         let idx = i * self.shape[1] + j; // Row-major ordering
+//         &self.data[idx]
+//     }
+// }
+
+// impl IndexMut<(usize, usize)> for Tensor {
+//     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+//         let (i, j) = index;
+//         let idx = i * self.shape[1] + j; // Row-major ordering
+//         &mut self.data[idx]
+//     }
+// }
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
