@@ -32,6 +32,7 @@ pub struct Tensor {
     shape: Vec<usize>,
     stride: Vec<usize>,
     grad: Option<Box<Tensor>>,
+    children: Option<Op>,
 
     // physical
     device: Device,
@@ -97,6 +98,7 @@ impl Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             grad: None,
+            children: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -120,6 +122,7 @@ impl Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             grad: None,
+            children: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -143,6 +146,7 @@ impl Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             grad: None,
+            children: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -225,11 +229,12 @@ impl Tensor {
             let grad_tensor = Tensor {
                 shape: self.shape.clone(),
                 stride: self.stride.clone(),
+                grad: None,
+                children: None,
                 device: self.device.clone(),
                 layout: self.layout.clone(),
                 dtype: self.dtype.clone(),
                 data: vec![1.0; self.data.len()],
-                grad: None,
             };
             self.grad = Some(Box::new(grad_tensor));
         }
@@ -239,6 +244,7 @@ impl Tensor {
 }
 
 #[rustfmt::skip]
+#[derive(Clone, Debug)]
 enum Op {
     Add(Box<Tensor>, Box<Tensor>),
     Sub(Box<Tensor>, Box<Tensor>),
@@ -305,6 +311,7 @@ impl Op {
             shape: a.shape.clone(),
             stride: a.stride.clone(),
             grad: None,
+            children: None,
             device: a.device.clone(),
             layout: a.layout.clone(),
             dtype: a.dtype.clone(),
@@ -317,7 +324,10 @@ impl Add for Tensor {
     type Output = Tensor;
 
     fn add(self, other: Tensor) -> Self::Output {
-        Op::Add(Box::new(self), Box::new(other)).forward()
+        let op = Op::Add(Box::new(self), Box::new(other));
+        let mut output = op.forward();
+        output.children = Some(op);
+        output
     }
 }
 
@@ -333,7 +343,10 @@ impl Mul for Tensor {
     type Output = Tensor;
 
     fn mul(self, other: Tensor) -> Self::Output {
-        Op::Mul(Box::new(self), Box::new(other)).forward()
+        let op = Op::Mul(Box::new(self), Box::new(other));
+        let mut output = op.forward();
+        output.children = Some(op);
+        output
     }
 }
 
