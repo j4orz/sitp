@@ -31,7 +31,6 @@ pub struct Tensor {
     // logical
     shape: Vec<usize>,
     stride: Vec<usize>,
-    // offset: bool,
     grad: Option<Box<Tensor>>,
 
     // physical
@@ -258,82 +257,10 @@ enum Op {
 impl Op {
     fn forward(&self) -> Tensor {
         match self {
-            Op::Add(a, b) => {
-                assert_eq!(a.shape, b.shape, "Shape mismatch in addition");
-                let data = a
-                    .data
-                    .iter()
-                    .zip(b.data.iter())
-                    .map(|(&a, &b)| a + b)
-                    .collect();
-
-                Tensor {
-                    shape: a.shape.clone(),
-                    stride: a.stride.clone(),
-                    grad: None,
-                    device: a.device.clone(),
-                    layout: a.layout.clone(),
-                    dtype: a.dtype.clone(),
-                    data,
-                }
-            }
-            Op::Sub(a, b) => {
-                assert_eq!(a.shape, b.shape, "Shape mismatch in subtraction");
-                let data = a
-                    .data
-                    .iter()
-                    .zip(b.data.iter())
-                    .map(|(&a, &b)| a - b)
-                    .collect();
-
-                Tensor {
-                    shape: a.shape.clone(),
-                    stride: a.stride.clone(),
-                    grad: None,
-                    device: a.device.clone(),
-                    layout: a.layout.clone(),
-                    dtype: a.dtype.clone(),
-                    data,
-                }
-            }
-            Op::Mul(a, b) => {
-                assert_eq!(a.shape, b.shape, "Shape mismatch in multiplication");
-                let data = a
-                    .data
-                    .iter()
-                    .zip(b.data.iter())
-                    .map(|(&a, &b)| a * b)
-                    .collect();
-
-                Tensor {
-                    shape: a.shape.clone(),
-                    stride: a.stride.clone(),
-                    grad: None,
-                    device: a.device.clone(),
-                    layout: a.layout.clone(),
-                    dtype: a.dtype.clone(),
-                    data,
-                }
-            }
-            Op::Div(a, b) => {
-                assert_eq!(a.shape, b.shape, "Shape mismatch in division");
-                let data = a
-                    .data
-                    .iter()
-                    .zip(b.data.iter())
-                    .map(|(&a, &b)| a / b)
-                    .collect();
-
-                Tensor {
-                    shape: a.shape.clone(),
-                    stride: a.stride.clone(),
-                    grad: None,
-                    device: a.device.clone(),
-                    layout: a.layout.clone(),
-                    dtype: a.dtype.clone(),
-                    data,
-                }
-            }
+            Op::Add(a, b) => Self::apply_binary_op(a, b, |a, b| a + b),
+            Op::Sub(a, b) => Self::apply_binary_op(a, b, |a, b| a - b),
+            Op::Mul(a, b) => Self::apply_binary_op(a, b, |a, b| a * b),
+            Op::Div(a, b) => Self::apply_binary_op(a, b, |a, b| a / b),
             Op::Sin(x) => todo!(),
             Op::Cos(x) => todo!(),
             Op::Exp(x) => todo!(),
@@ -359,6 +286,29 @@ impl Op {
             Op::Tanh(x) => todo!(),
             Op::Mean(x) => todo!(),
             Op::Var(x) => todo!(),
+        }
+    }
+
+    fn apply_binary_op<F>(a: &Tensor, b: &Tensor, op: F) -> Tensor
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        assert_eq!(a.shape, b.shape, "Shape mismatch in operation");
+        let data = a
+            .data
+            .iter()
+            .zip(b.data.iter())
+            .map(|(&a_val, &b_val)| op(a_val, b_val))
+            .collect();
+
+        Tensor {
+            shape: a.shape.clone(),
+            stride: a.stride.clone(),
+            grad: None,
+            device: a.device.clone(),
+            layout: a.layout.clone(),
+            dtype: a.dtype.clone(),
+            data,
         }
     }
 }
