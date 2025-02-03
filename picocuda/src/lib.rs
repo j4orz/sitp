@@ -32,7 +32,7 @@ pub struct Tensor {
     shape: Vec<usize>,
     stride: Vec<usize>,
     // offset: bool,
-    // grad: Box<Tensor>,
+    grad: Option<Box<Tensor>>,
 
     // physical
     device: Device,
@@ -97,6 +97,7 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
+            grad: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -119,6 +120,7 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
+            grad: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -141,6 +143,7 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
+            grad: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -214,29 +217,157 @@ impl Tensor {
 }
 
 // *****************************************************************************************************************
-// ************************************************** OPERATIONS ***************************************************
+// ************************************************ AUTOGRAD + OPS *************************************************
 // *****************************************************************************************************************
+
+impl Tensor {
+    fn backward(mut self) -> Self {
+        if self.grad.is_none() {
+            let grad_tensor = Tensor {
+                shape: self.shape.clone(),
+                stride: self.stride.clone(),
+                device: self.device.clone(),
+                layout: self.layout.clone(),
+                dtype: self.dtype.clone(),
+                data: vec![1.0; self.data.len()],
+                grad: None,
+            };
+            self.grad = Some(Box::new(grad_tensor));
+        }
+
+        todo!()
+    }
+}
+
+#[rustfmt::skip]
+enum Op {
+    Add(Box<Tensor>, Box<Tensor>),
+    Sub(Box<Tensor>, Box<Tensor>),
+    Mul(Box<Tensor>, Box<Tensor>),
+    Div(Box<Tensor>, Box<Tensor>),
+    Sin(Box<Tensor>),
+    Cos(Box<Tensor>),
+    Exp(Box<Tensor>),
+    Log(Box<Tensor>),
+    Matmul(Box<Tensor>, Box<Tensor>),
+    Tanh(Box<Tensor>),
+    Mean(Box<Tensor>),
+    Var(Box<Tensor>),
+}
+
+impl Op {
+    fn forward(&self) -> Tensor {
+        match self {
+            Op::Add(a, b) => {
+                assert_eq!(a.shape, b.shape, "Shape mismatch in addition");
+                let data = a
+                    .data
+                    .iter()
+                    .zip(b.data.iter())
+                    .map(|(&a, &b)| a + b)
+                    .collect();
+
+                Tensor {
+                    shape: a.shape.clone(),
+                    stride: a.stride.clone(),
+                    grad: None,
+                    device: a.device.clone(),
+                    layout: a.layout.clone(),
+                    dtype: a.dtype.clone(),
+                    data,
+                }
+            }
+            Op::Sub(a, b) => {
+                assert_eq!(a.shape, b.shape, "Shape mismatch in subtraction");
+                let data = a
+                    .data
+                    .iter()
+                    .zip(b.data.iter())
+                    .map(|(&a, &b)| a - b)
+                    .collect();
+
+                Tensor {
+                    shape: a.shape.clone(),
+                    stride: a.stride.clone(),
+                    grad: None,
+                    device: a.device.clone(),
+                    layout: a.layout.clone(),
+                    dtype: a.dtype.clone(),
+                    data,
+                }
+            }
+            Op::Mul(a, b) => {
+                assert_eq!(a.shape, b.shape, "Shape mismatch in multiplication");
+                let data = a
+                    .data
+                    .iter()
+                    .zip(b.data.iter())
+                    .map(|(&a, &b)| a * b)
+                    .collect();
+
+                Tensor {
+                    shape: a.shape.clone(),
+                    stride: a.stride.clone(),
+                    grad: None,
+                    device: a.device.clone(),
+                    layout: a.layout.clone(),
+                    dtype: a.dtype.clone(),
+                    data,
+                }
+            }
+            Op::Div(a, b) => {
+                assert_eq!(a.shape, b.shape, "Shape mismatch in division");
+                let data = a
+                    .data
+                    .iter()
+                    .zip(b.data.iter())
+                    .map(|(&a, &b)| a / b)
+                    .collect();
+
+                Tensor {
+                    shape: a.shape.clone(),
+                    stride: a.stride.clone(),
+                    grad: None,
+                    device: a.device.clone(),
+                    layout: a.layout.clone(),
+                    dtype: a.dtype.clone(),
+                    data,
+                }
+            }
+            Op::Sin(x) => todo!(),
+            Op::Cos(x) => todo!(),
+            Op::Exp(x) => todo!(),
+            Op::Log(x) => todo!(),
+            Op::Matmul(a, b) => todo!(),
+            Op::Tanh(x) => todo!(),
+            Op::Mean(x) => todo!(),
+            Op::Var(x) => todo!(),
+        }
+    }
+
+    fn backward(&self, grad: &Tensor) -> Vec<Tensor> {
+        match self {
+            Op::Add(_, _) => todo!(),
+            Op::Sub(_, _) => todo!(),
+            Op::Mul(_, _) => todo!(),
+            Op::Div(_, _) => todo!(),
+            Op::Sin(x) => todo!(),
+            Op::Cos(x) => todo!(),
+            Op::Exp(x) => todo!(),
+            Op::Log(x) => todo!(),
+            Op::Matmul(a, b) => todo!(),
+            Op::Tanh(x) => todo!(),
+            Op::Mean(x) => todo!(),
+            Op::Var(x) => todo!(),
+        }
+    }
+}
 
 impl Add for Tensor {
     type Output = Tensor;
 
     fn add(self, other: Tensor) -> Self::Output {
-        assert_eq!(self.shape, other.shape, "Shape mismatch in addition");
-        let data = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            .map(|(&a, &b)| a + b)
-            .collect();
-
-        Tensor {
-            shape: self.shape,
-            stride: self.stride,
-            device: self.device,
-            layout: self.layout,
-            dtype: self.dtype,
-            data,
-        }
+        Op::Add(Box::new(self), Box::new(other)).forward()
     }
 }
 
@@ -244,22 +375,7 @@ impl Sub for Tensor {
     type Output = Tensor;
 
     fn sub(self, other: Tensor) -> Self::Output {
-        assert_eq!(self.shape, other.shape, "Shape mismatch in subtraction");
-        let data = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            .map(|(&a, &b)| a - b)
-            .collect();
-
-        Tensor {
-            shape: self.shape,
-            stride: self.stride,
-            device: self.device,
-            layout: self.layout,
-            dtype: self.dtype,
-            data,
-        }
+        Op::Sub(Box::new(self), Box::new(other)).forward()
     }
 }
 
@@ -267,22 +383,7 @@ impl Mul for Tensor {
     type Output = Tensor;
 
     fn mul(self, other: Tensor) -> Self::Output {
-        assert_eq!(self.shape, other.shape, "Shape mismatch in multiplication");
-        let data = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            .map(|(&a, &b)| a * b)
-            .collect();
-
-        Tensor {
-            shape: self.shape,
-            stride: self.stride,
-            device: self.device,
-            layout: self.layout,
-            dtype: self.dtype,
-            data,
-        }
+        Op::Mul(Box::new(self), Box::new(other)).forward()
     }
 }
 
@@ -290,22 +391,7 @@ impl Div for Tensor {
     type Output = Tensor;
 
     fn div(self, other: Tensor) -> Self::Output {
-        assert_eq!(self.shape, other.shape, "Shape mismatch in division");
-        let data = self
-            .data
-            .iter()
-            .zip(other.data.iter())
-            .map(|(&a, &b)| a / b)
-            .collect();
-
-        Tensor {
-            shape: self.shape,
-            stride: self.stride,
-            device: self.device,
-            layout: self.layout,
-            dtype: self.dtype,
-            data,
-        }
+        Op::Div(Box::new(self), Box::new(other)).forward()
     }
 }
 

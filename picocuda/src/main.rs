@@ -16,16 +16,15 @@ fn main() {
     );
 
     let x = Tensor::randn(&[4, 4]);
-    println!("{:?}", x);
     println!("{}", x);
 
     let y = Tensor::randn(&[4, 4]);
-    println!("{:?}", y);
     println!("{}", y);
 
-    let z = x + y;
-    println!("{:?}", z);
+    let mut z = x + y;
     println!("{}", z);
+
+    z.backward();
 
     // let y = x.view(&[16]);
     // println!("{}", y);
