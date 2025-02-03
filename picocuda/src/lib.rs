@@ -221,7 +221,22 @@ impl Add for Tensor {
     type Output = Tensor;
 
     fn add(self, other: Tensor) -> Self::Output {
-        todo!()
+        assert_eq!(self.shape, other.shape, "Shape mismatch in addition");
+        let data = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            .map(|(&a, &b)| a + b)
+            .collect();
+
+        Tensor {
+            shape: self.shape,
+            stride: self.stride,
+            device: self.device,
+            layout: self.layout,
+            dtype: self.dtype,
+            data,
+        }
     }
 }
 
@@ -229,7 +244,22 @@ impl Sub for Tensor {
     type Output = Tensor;
 
     fn sub(self, other: Tensor) -> Self::Output {
-        todo!()
+        assert_eq!(self.shape, other.shape, "Shape mismatch in subtraction");
+        let data = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            .map(|(&a, &b)| a - b)
+            .collect();
+
+        Tensor {
+            shape: self.shape,
+            stride: self.stride,
+            device: self.device,
+            layout: self.layout,
+            dtype: self.dtype,
+            data,
+        }
     }
 }
 
@@ -237,7 +267,22 @@ impl Mul for Tensor {
     type Output = Tensor;
 
     fn mul(self, other: Tensor) -> Self::Output {
-        todo!()
+        assert_eq!(self.shape, other.shape, "Shape mismatch in multiplication");
+        let data = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            .map(|(&a, &b)| a * b)
+            .collect();
+
+        Tensor {
+            shape: self.shape,
+            stride: self.stride,
+            device: self.device,
+            layout: self.layout,
+            dtype: self.dtype,
+            data,
+        }
     }
 }
 
@@ -245,7 +290,22 @@ impl Div for Tensor {
     type Output = Tensor;
 
     fn div(self, other: Tensor) -> Self::Output {
-        todo!()
+        assert_eq!(self.shape, other.shape, "Shape mismatch in division");
+        let data = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            .map(|(&a, &b)| a / b)
+            .collect();
+
+        Tensor {
+            shape: self.shape,
+            stride: self.stride,
+            device: self.device,
+            layout: self.layout,
+            dtype: self.dtype,
+            data,
+        }
     }
 }
 

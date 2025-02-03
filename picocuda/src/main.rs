@@ -24,8 +24,8 @@ fn main() {
     println!("{}", y);
 
     let z = x + y;
-    // println!("{:?}", z);
-    // println!("{}", z);
+    println!("{:?}", z);
+    println!("{}", z);
 
     // let y = x.view(&[16]);
     // println!("{}", y);
