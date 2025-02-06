@@ -2,43 +2,51 @@ use pyo3::prelude::*;
 use rand::distr::StandardUniform;
 use rand::Rng;
 use std::{
+    cell::RefCell,
     fmt::{self, Display},
     ops::{Add, Div, Index, IndexMut, Mul, Sub},
+    rc::Rc,
 };
 
 // pub mod nn;
 
-// TODO
-// - strides (read/write)
-// - algebraic/transcendental ops (+, *, sin, cos, exp, log, etc.)
-// - autograd
-// - fuzzer
+#[rustfmt::skip]
+#[derive(Clone, Debug)]
+pub enum Device { Cpu, Cuda, Mps }
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
-enum Device { Cpu, Cuda, Mps }
+pub enum Layout { Strided  } // Sparse, // MklDnn
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
-enum Layout { Strided  } // Sparse, // MklDnn
+pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64 }
 
-#[rustfmt::skip]
-#[derive(Clone, Debug)]
-enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64 }
+// *********************************************************************************************************************
+// ************************************************** DYNAMIC GRAPH ****************************************************
+// *********************************************************************************************************************
+
+// - lifetime: deallocation semantics
+//   - Box<_>: N/A (exclusive ownership)
+//   - Rc<_>: reference counting
+//   - arena:
+// - mutation: needed for .backward()
+//   - RefCell<_>: safe
+//   - UnsafeCell<_>: efficient
 
 #[derive(Clone, Debug)]
 pub struct Tensor {
     // logical
-    shape: Vec<usize>,
-    stride: Vec<usize>,
-    grad: Option<Box<Tensor>>,
-    children: Option<Op>,
+    pub shape: Vec<usize>,
+    pub stride: Vec<usize>,
+    pub grad: Option<Box<Tensor>>,
+    pub input: Option<RefCell<Rc<Op>>>, // todo: weak for cyclic? NN's should be DAG's though
 
     // physical
-    device: Device,
-    layout: Layout,
-    dtype: Dtype,
-    data: Vec<f32>, // picograd fixed on fp32 to bootstrap
+    pub device: Device,
+    pub layout: Layout,
+    pub dtype: Dtype,
+    pub data: Vec<f32>, // picograd fixed on fp32 to bootstrap
 }
 
 // TODO: impl .item() for pythonic pytorch api?
@@ -98,7 +106,7 @@ impl Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             grad: None,
-            children: None,
+            input: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -122,7 +130,7 @@ impl Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             grad: None,
-            children: None,
+            input: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -146,7 +154,7 @@ impl Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             grad: None,
-            children: None,
+            input: None,
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
@@ -224,46 +232,40 @@ impl Tensor {
 // *****************************************************************************************************************
 
 impl Tensor {
-    pub fn backward(mut self) -> Self {
+    pub fn backward(mut self) -> () {
         if self.grad.is_none() {
-            let grad_tensor = Tensor {
-                shape: self.shape.clone(),
-                stride: self.stride.clone(),
-                grad: None,
-                children: None,
-                device: self.device.clone(),
-                layout: self.layout.clone(),
-                dtype: self.dtype.clone(),
-                data: vec![1.0; self.data.len()],
-            };
-            self.grad = Some(Box::new(grad_tensor));
+            self.grad = Some(Box::new(Tensor::ones(&self.shape)));
         }
 
-        todo!()
+        if let None = self.input {
+            return ();
+        }
+
+        
     }
 }
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
-enum Op {
-    Add(Box<Tensor>, Box<Tensor>), Sub(Box<Tensor>, Box<Tensor>), Mul(Box<Tensor>, Box<Tensor>), Div(Box<Tensor>, Box<Tensor>), // algebraic
-    Sin(Box<Tensor>), Cos(Box<Tensor>), Exp(Box<Tensor>), Log(Box<Tensor>), // transcendental
-    Matmul(Box<Tensor>, Box<Tensor>), Tanh(Box<Tensor>), // linear/nonlinear
-    Mean(Box<Tensor>), Var(Box<Tensor>), // statistics
+pub enum Op {
+    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), // algebraic
+    Sin(Tensor), Cos(Tensor), Exp(Tensor), Log(Tensor), // transcendental
+    Matmul(Tensor, Tensor), Tanh(Tensor), // linear/nonlinear
+    Mean(Tensor), Var(Tensor), // statistics
 }
 
 impl Op {
     fn forward(&self) -> Tensor {
-        match self {
-            Op::Add(a, b) => Self::apply_binary_op(a, b, |a, b| a + b),
-            Op::Sub(a, b) => Self::apply_binary_op(a, b, |a, b| a - b),
-            Op::Mul(a, b) => Self::apply_binary_op(a, b, |a, b| a * b),
-            Op::Div(a, b) => Self::apply_binary_op(a, b, |a, b| a / b),
+        match &self {
+            Op::Add(x, y) => self.apply_binary_op(|xi, yi| xi + yi, x, y),
+            Op::Sub(x, y) => self.apply_binary_op(|xi, yi| xi - yi, x, y),
+            Op::Mul(x, y) => self.apply_binary_op(|xi, yi| xi * yi, x, y),
+            Op::Div(x, y) => self.apply_binary_op(|xi, yi| xi / yi, x, y),
             Op::Sin(x) => todo!(),
             Op::Cos(x) => todo!(),
             Op::Exp(x) => todo!(),
             Op::Log(x) => todo!(),
-            Op::Matmul(a, b) => todo!(),
+            Op::Matmul(x, y) => todo!(),
             Op::Tanh(x) => todo!(),
             Op::Mean(x) => todo!(),
             Op::Var(x) => todo!(),
@@ -272,10 +274,10 @@ impl Op {
 
     fn backward(&self, grad: &Tensor) -> Vec<Tensor> {
         match self {
-            Op::Add(_, _) => todo!(),
-            Op::Sub(_, _) => todo!(),
-            Op::Mul(_, _) => todo!(),
-            Op::Div(_, _) => todo!(),
+            Op::Add(x, y) => todo!(),
+            Op::Sub(x, y) => todo!(),
+            Op::Mul(x, y) => todo!(),
+            Op::Div(x, y) => todo!(),
             Op::Sin(x) => todo!(),
             Op::Cos(x) => todo!(),
             Op::Exp(x) => todo!(),
@@ -287,66 +289,37 @@ impl Op {
         }
     }
 
-    fn apply_binary_op<F>(a: &Tensor, b: &Tensor, op: F) -> Tensor
+    fn apply_binary_op<F>(&self, f: F, a: &Tensor, b: &Tensor) -> Tensor
     where
         F: Fn(f32, f32) -> f32,
     {
         assert_eq!(a.shape, b.shape, "Shape mismatch in operation");
-        let data = a
-            .data
-            .iter()
-            .zip(b.data.iter())
-            .map(|(&a_val, &b_val)| op(a_val, b_val))
-            .collect();
 
         Tensor {
             shape: a.shape.clone(),
             stride: a.stride.clone(),
             grad: None,
-            children: None,
+            input: Some(RefCell::new(Rc::new(self.clone()))), // todo: avoid alloc?
             device: a.device.clone(),
             layout: a.layout.clone(),
             dtype: a.dtype.clone(),
-            data,
+            data: a
+                .data
+                .iter()
+                .zip(b.data.iter())
+                .map(|(&a_val, &b_val)| f(a_val, b_val))
+                .collect(),
         }
     }
 }
 
-impl Add for Tensor {
+impl Add for &Tensor {
     type Output = Tensor;
 
-    fn add(self, other: Tensor) -> Self::Output {
-        let op = Op::Add(Box::new(self), Box::new(other));
-        let mut output = op.forward();
-        output.children = Some(op);
+    fn add(self, other: &Tensor) -> Self::Output {
+        let op = Op::Add(self.clone(), other.clone());
+        let output = op.forward();
         output
-    }
-}
-
-impl Sub for Tensor {
-    type Output = Tensor;
-
-    fn sub(self, other: Tensor) -> Self::Output {
-        Op::Sub(Box::new(self), Box::new(other)).forward()
-    }
-}
-
-impl Mul for Tensor {
-    type Output = Tensor;
-
-    fn mul(self, other: Tensor) -> Self::Output {
-        let op = Op::Mul(Box::new(self), Box::new(other));
-        let mut output = op.forward();
-        output.children = Some(op);
-        output
-    }
-}
-
-impl Div for Tensor {
-    type Output = Tensor;
-
-    fn div(self, other: Tensor) -> Self::Output {
-        Op::Div(Box::new(self), Box::new(other)).forward()
     }
 }
 

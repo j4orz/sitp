@@ -1,4 +1,7 @@
-mod lib; // TODO?
+mod lib;
+use std::rc::Rc;
+
+// TODO?
 use lib::Tensor;
 
 fn main() {
@@ -16,19 +19,15 @@ fn main() {
     );
 
     let x = Tensor::randn(&[4, 4]);
-    println!("{}", x);
-
     let y = Tensor::randn(&[4, 4]);
+    let mut z = &x + &y; // TODO: autoderef
+    println!("{}", x);
     println!("{}", y);
-
-    let mut z = x + y;
     println!("{}", z);
 
+    println!("{:?}", x.grad);
+    println!("{:?}", y.grad);
     z.backward();
-
-    // let y = x.view(&[16]);
-    // println!("{}", y);
-
-    // let z = y.view(&[-1, 8]);
-    // println!("{}", z);
+    println!("{:?}", x.grad);
+    println!("{:?}", y.grad);
 }
