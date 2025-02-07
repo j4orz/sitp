@@ -1,8 +1,4 @@
-mod lib;
-use std::rc::Rc;
-
-// TODO?
-use lib::Tensor;
+use picograd::Tensor;
 
 fn main() {
     println!(
