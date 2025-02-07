@@ -35,7 +35,7 @@ pub struct Tensor {
     // logical
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
-    pub grad: Option<Box<Tensor>>,
+    pub grad: Option<Box<Vec<Tensor>>>,
     pub input: Option<Box<Op>>, // todo: weak for cyclic? NN's should be DAG's though
 
     // physical
@@ -251,11 +251,13 @@ impl Tensor {
     // reversemode/forwardmode is same for \mathbb{R} because of associativity
     // but with \mahtbb{R^{nxm}} you have to make sure matrices are associative
     pub fn backward(mut self) -> () {
-        self.grad = Some(Box::new(Tensor::ones(&self.shape))); // base case dfdx
+        self.grad = Some(Box::new(vec![Tensor::ones(&self.shape)])); // base case dfdx
         let (mut topo, mut visited) = (Vec::new(), HashSet::new());
         self.topo(&mut topo, &mut visited);
-        for tensor in topo.into_iter().rev() {
-            tensor.grad = tensor.input.backward(); // need a Vec<Box<Tensor>> ??
+        for mut tensor in topo.into_iter().rev() {
+            if let Some(ref op) = tensor.input {
+                tensor.grad = Some(Box::new(op.backward(&tensor)));
+            }
         }
     }
 
