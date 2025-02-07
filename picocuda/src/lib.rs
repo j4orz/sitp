@@ -3,9 +3,64 @@ use differentiator::Op;
 use pyo3::prelude::*;
 use rand::distr::StandardUniform;
 use rand::Rng;
-use std::fmt::{self, Display};
+use std::{
+    cell::RefCell,
+    fmt::{self, Display},
+    rc::Rc,
+};
 
 // pub mod nn;
+
+// - lifetime: deallocation semantics
+//   - Box<_>: N/A (exclusive ownership)
+//   - Rc<_>: reference counting
+//   - arena:
+// - mutation: needed for .backward()
+//   - RefCell<_>: safe
+//   - UnsafeCell<_>: efficient
+
+#[derive(Debug)]
+pub struct Tensor {
+    // logical
+    pub shape: Vec<usize>,
+    pub stride: Vec<usize>,
+    pub input: Option<Box<Op>>, // need indirection since Op owns a Tensor
+
+    // physical
+    pub storage: Rc<RefCell<Storage>>,
+    pub device: Device,
+    pub layout: Layout,
+    pub dtype: Dtype,
+}
+
+impl Clone for Tensor {
+    fn clone(&self) -> Self {
+        Self {
+            shape: self.shape.clone(),
+            stride: self.stride.clone(),
+            input: self.input.clone(),
+            storage: self.storage.clone(), // Rc::clone()
+            device: self.device.clone(),
+            layout: self.layout.clone(),
+            dtype: self.dtype.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Storage {
+    pub data: Vec<f32>, // picograd fixed on fp32 to bootstrap
+    pub grad: Option<Vec<Tensor>>,
+}
+
+// TODO: impl .item() for pythonic pytorch api?
+impl Display for Tensor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f, &self.shape, &self.stride, 0)
+    }
+}
+
+// ********************************************* physical types **********************************************
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
@@ -18,36 +73,6 @@ pub enum Layout { Strided  } // Sparse, // MklDnn
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
 pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64 }
-
-// - lifetime: deallocation semantics
-//   - Box<_>: N/A (exclusive ownership)
-//   - Rc<_>: reference counting
-//   - arena:
-// - mutation: needed for .backward()
-//   - RefCell<_>: safe
-//   - UnsafeCell<_>: efficient
-
-#[derive(Clone, Debug)]
-pub struct Tensor {
-    // logical
-    pub shape: Vec<usize>,
-    pub stride: Vec<usize>,
-    pub grad: Option<Box<Vec<Tensor>>>,
-    pub input: Option<Box<Op>>, // todo: weak for cyclic? NN's should be DAG's though
-
-    // physical
-    pub device: Device,
-    pub layout: Layout,
-    pub dtype: Dtype,
-    pub data: Vec<f32>, // picograd fixed on fp32 to bootstrap
-}
-
-// TODO: impl .item() for pythonic pytorch api?
-impl Display for Tensor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format(f, &self.shape, &self.stride, 0)
-    }
-}
 
 impl Tensor {
     // *****************************************************************************************************************
@@ -79,12 +104,11 @@ impl Tensor {
         Tensor {
             shape: vec![data.len()],
             stride: Self::stride(&vec![data.len()]),
-            grad: None,
             input: None,
+            storage: Rc::new(RefCell::new(Storage { data, grad: None })),
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
-            data,
         }
     }
 
@@ -108,12 +132,11 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
-            grad: None,
             input: None,
+            storage: Rc::new(RefCell::new(Storage { data, grad: None })),
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
-            data,
         }
     }
 
@@ -132,12 +155,14 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
-            grad: None,
             input: None,
+            storage: Rc::new(RefCell::new(Storage {
+                data: vec![0.0; size],
+                grad: None,
+            })),
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
-            data: vec![0.0; size],
         }
     }
 
@@ -156,12 +181,14 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
-            grad: None,
             input: None,
+            storage: Rc::new(RefCell::new(Storage {
+                data: vec![1.0; size],
+                grad: None,
+            })),
             device: Device::Cpu,
             layout: Layout::Strided,
             dtype: Dtype::Float32,
-            data: vec![1.0; size],
         }
     }
 
@@ -202,7 +229,7 @@ impl Tensor {
     ) -> fmt::Result {
         match (shape, stride) {
             ([], []) => {
-                write!(fmt, "{:.4}", self.data[offset])?;
+                write!(fmt, "{:.4}", self.storage.borrow().data[offset])?;
                 Ok(())
             }
             // basecase: indexed ndarray all the way through
