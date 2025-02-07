@@ -185,7 +185,10 @@ impl Tensor {
 
         for tensor in topo.into_iter() {
             if let Some(ref input_op) = tensor.input_op {
-                let (inputs, input_grads) = (input_op.inputs(), input_op.backward(&tensor));
+                let (inputs, input_grads) = (
+                    input_op.inputs(),
+                    input_op.backward(&tensor.storage.borrow().grad.as_ref().unwrap()),
+                );
 
                 for (x, dfdx_next) in inputs.into_iter().zip(input_grads.iter()) {
                     let mut storage = x.storage.borrow_mut();
@@ -206,7 +209,6 @@ impl Tensor {
         match self.input_op {
             Some(ref op) => {
                 if visited.contains(&op) {
-                    // todo: op or tensor?
                     return;
                 }
                 visited.insert(*op.clone());
