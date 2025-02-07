@@ -1,9 +1,12 @@
 use std::{
+    cell::RefCell,
     collections::HashSet,
+    hash,
     ops::{Add, Mul},
+    rc::Rc,
 };
 
-use crate::Tensor;
+use crate::{Storage, Tensor};
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
@@ -16,6 +19,26 @@ pub enum Op {
     Mean(Tensor), Var(Tensor), // statistics
 }
 
+impl Op {
+    fn inputs(&self) -> Vec<&Tensor> {
+        // flatten inputs: tup -> vec
+        match self {
+            Op::Add(x, y) | Op::Sub(x, y) | Op::Mul(x, y) | Op::Div(x, y) | Op::Matmul(x, y) => {
+                vec![x, y]
+            }
+            Op::Sin(x)
+            | Op::Cos(x)
+            | Op::Exp(x)
+            | Op::Log(x)
+            | Op::Tanh(x)
+            | Op::Mean(x)
+            | Op::Var(x) => {
+                vec![x]
+            }
+        }
+    }
+}
+
 impl PartialEq for Op {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self, other) // reference comparison instead of value since f32 is not Eq.
@@ -24,9 +47,8 @@ impl PartialEq for Op {
 
 impl Eq for Op {}
 
-impl std::hash::Hash for Op {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Hash the memory address of self
+impl hash::Hash for Op {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
         (self as *const Self).hash(state);
     }
 }
@@ -62,17 +84,22 @@ impl Op {
         Tensor {
             shape: x.shape.clone(),
             stride: x.stride.clone(),
-            grad: None,
-            input: Some(Box::new(self.clone())), // todo: avoid alloc?
+            input_op: Some(Box::new(self.clone())), // Box since Op owns Tensors
+            // alloc new storage
+            storage: Rc::new(RefCell::new(Storage {
+                data: x
+                    .storage
+                    .borrow()
+                    .data
+                    .iter()
+                    .zip(y.storage.borrow().data.iter())
+                    .map(|(&xi, &yi)| f(xi, yi))
+                    .collect(),
+                grad: None,
+            })),
             device: x.device.clone(),
             layout: x.layout.clone(),
             dtype: x.dtype.clone(),
-            data: x
-                .data
-                .iter()
-                .zip(y.data.iter())
-                .map(|(&a_val, &b_val)| f(a_val, b_val))
-                .collect(),
         }
     }
 }
@@ -151,48 +178,46 @@ impl Tensor {
 
     // reversemode/forwardmode is same for \mathbb{R} because of associativity
     // but with \mahtbb{R^{nxm}} you have to make sure matrices are associative
-    pub fn backward(mut self) -> () {
-        self.grad = Some(Box::new(vec![Tensor::ones(&self.shape)])); // base case dfdx
+    pub fn backward(&mut self) -> () {
+        self.storage.borrow_mut().grad = Some(Tensor::ones(&self.shape)); // base case dfdx
         let (mut topo, mut visited) = (Vec::new(), HashSet::new());
         self.topo(&mut topo, &mut visited);
-        for mut tensor in topo.into_iter().rev() {
-            if let Some(ref op) = tensor.input {
-                tensor.grad = Some(Box::new(op.backward(&tensor)));
+
+        for tensor in topo.into_iter() {
+            if let Some(ref input_op) = tensor.input_op {
+                let (inputs, input_grads) = (input_op.inputs(), input_op.backward(&tensor));
+
+                for (x, dfdx_next) in inputs.into_iter().zip(input_grads.iter()) {
+                    let mut storage = x.storage.borrow_mut();
+                    match storage.grad {
+                        Some(ref mut dfdx_prev) => {
+                            *dfdx_prev = &*dfdx_prev + dfdx_next;
+                        }
+                        None => {
+                            storage.grad = Some(dfdx_next.clone());
+                        }
+                    }
+                }
             }
         }
     }
 
     fn topo(&self, topo: &mut Vec<Tensor>, visited: &mut HashSet<Op>) {
-        match self.input {
+        match self.input_op {
             Some(ref op) => {
                 if visited.contains(&op) {
+                    // todo: op or tensor?
                     return;
                 }
-                visited.insert(*op.clone()); // Box<_>?
-
-                // flatten inputs: tup -> vec
-                let inputs = match &**op {
-                    Op::Add(x, y)
-                    | Op::Sub(x, y)
-                    | Op::Mul(x, y)
-                    | Op::Div(x, y)
-                    | Op::Matmul(x, y) => vec![x, y],
-                    Op::Sin(x)
-                    | Op::Cos(x)
-                    | Op::Exp(x)
-                    | Op::Log(x)
-                    | Op::Tanh(x)
-                    | Op::Mean(x)
-                    | Op::Var(x) => vec![x],
-                };
-
-                for input in inputs {
+                visited.insert(*op.clone());
+                for input in op.inputs() {
                     input.topo(topo, visited);
                 }
-                topo.push(self.clone());
             }
-            None => todo!(),
+            None => {}
         }
+
+        topo.push(self.clone());
     }
 }
 

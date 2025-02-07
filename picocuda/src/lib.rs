@@ -24,7 +24,7 @@ pub struct Tensor {
     // logical
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
-    pub input: Option<Box<Op>>, // need indirection since Op owns a Tensor
+    pub input_op: Option<Box<Op>>, // need indirection since Op owns a Tensor
 
     // physical
     pub storage: Rc<RefCell<Storage>>,
@@ -38,7 +38,7 @@ impl Clone for Tensor {
         Self {
             shape: self.shape.clone(),
             stride: self.stride.clone(),
-            input: self.input.clone(),
+            input_op: self.input_op.clone(),
             storage: self.storage.clone(), // Rc::clone()
             device: self.device.clone(),
             layout: self.layout.clone(),
@@ -50,7 +50,7 @@ impl Clone for Tensor {
 #[derive(Clone, Debug)]
 pub struct Storage {
     pub data: Vec<f32>, // picograd fixed on fp32 to bootstrap
-    pub grad: Option<Vec<Tensor>>,
+    pub grad: Option<Tensor>,
 }
 
 // TODO: impl .item() for pythonic pytorch api?
@@ -104,7 +104,7 @@ impl Tensor {
         Tensor {
             shape: vec![data.len()],
             stride: Self::stride(&vec![data.len()]),
-            input: None,
+            input_op: None,
             storage: Rc::new(RefCell::new(Storage { data, grad: None })),
             device: Device::Cpu,
             layout: Layout::Strided,
@@ -132,7 +132,7 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
-            input: None,
+            input_op: None,
             storage: Rc::new(RefCell::new(Storage { data, grad: None })),
             device: Device::Cpu,
             layout: Layout::Strided,
@@ -155,7 +155,7 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
-            input: None,
+            input_op: None,
             storage: Rc::new(RefCell::new(Storage {
                 data: vec![0.0; size],
                 grad: None,
@@ -181,7 +181,7 @@ impl Tensor {
         Tensor {
             shape: shape.to_owned(),
             stride: Self::stride(shape),
-            input: None,
+            input_op: None,
             storage: Rc::new(RefCell::new(Storage {
                 data: vec![1.0; size],
                 grad: None,
