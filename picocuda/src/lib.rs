@@ -22,6 +22,7 @@ use std::{
 #[derive(Debug)]
 pub struct Tensor {
     // logical
+    pub ndim: usize,
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
     pub input_op: Option<Box<Op>>, // need indirection since Op owns a Tensor
@@ -36,6 +37,7 @@ pub struct Tensor {
 impl Clone for Tensor {
     fn clone(&self) -> Self {
         Self {
+            ndim: self.ndim,
             shape: self.shape.clone(),
             stride: self.stride.clone(),
             input_op: self.input_op.clone(),
@@ -102,6 +104,7 @@ impl Tensor {
     // todo: requires_grad: bool
     pub fn new(data: Vec<f32>) -> Self {
         Tensor {
+            ndim: 1,
             shape: vec![data.len()],
             stride: Self::stride(&vec![data.len()]),
             input_op: None,
@@ -130,6 +133,7 @@ impl Tensor {
             .collect::<Vec<f32>>();
 
         Tensor {
+            ndim: shape.len(),
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             input_op: None,
@@ -138,6 +142,19 @@ impl Tensor {
             layout: Layout::Strided,
             dtype: Dtype::Float32,
         }
+    }
+
+    pub fn arange(start: f32, end: f32, step: f32) -> Self {
+        todo!()
+        // let size = (end - start) / step;
+        // let data = (0..size).map(|i| start + i * step).collect::<Vec<f32>>();
+        // Tensor::new(data)
+    }
+
+    pub fn linspace(start: f32, end: f32, steps: usize) -> Self {
+        todo!()
+        // let data = (0..steps).map(|i| start + i * (end - start) / (steps - 1) as f32).collect::<Vec<f32>>();
+        // Tensor::new(data)
     }
 
     /// returns a tensor filled with the scalar value 0, with the shape defined by the variable argument size
@@ -153,6 +170,7 @@ impl Tensor {
     pub fn zeros(shape: &[usize]) -> Self {
         let size: usize = shape.iter().product::<usize>();
         Tensor {
+            ndim: shape.len(),
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             input_op: None,
@@ -179,6 +197,7 @@ impl Tensor {
     pub fn ones(shape: &[usize]) -> Self {
         let size = shape.iter().product::<usize>();
         Tensor {
+            ndim: shape.len(),
             shape: shape.to_owned(),
             stride: Self::stride(shape),
             input_op: None,
