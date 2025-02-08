@@ -14,9 +14,9 @@ pub enum Op {
     // ***desugared core*** (trascendental ops can be desugared to algebraic via power series (not taylor, contra calc teachers))
     Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), // algebraic
     // ***sugar***
-    Sin(Tensor), Cos(Tensor), Exp(Tensor), Log(Tensor), // transcendental
     Matmul(Tensor, Tensor), Tanh(Tensor), // linear/nonlinear
-    Mean(Tensor), Var(Tensor), // statistics
+    // Sin(Tensor), Cos(Tensor), Exp(Tensor), Log(Tensor), // transcendental
+    // Mean(Tensor), Var(Tensor), // statistics
 }
 
 impl Op {
@@ -26,13 +26,13 @@ impl Op {
             Op::Add(x, y) | Op::Sub(x, y) | Op::Mul(x, y) | Op::Div(x, y) | Op::Matmul(x, y) => {
                 vec![x, y]
             }
-            Op::Sin(x)
-            | Op::Cos(x)
-            | Op::Exp(x)
-            | Op::Log(x)
-            | Op::Tanh(x)
-            | Op::Mean(x)
-            | Op::Var(x) => {
+            Op::Tanh(x)
+            // | Op::Sin(x)
+            // | Op::Cos(x)
+            // | Op::Exp(x)
+            // | Op::Log(x)
+            // | Op::Mean(x) | Op::Var(x)
+            => {
                 vec![x]
             }
         }
@@ -64,14 +64,14 @@ impl Op {
             Op::Sub(x, y) => self.apply_binary_op(|xi, yi| xi - yi, x, y),
             Op::Mul(x, y) => self.apply_binary_op(|xi, yi| xi * yi, x, y),
             Op::Div(x, y) => self.apply_binary_op(|xi, yi| xi / yi, x, y),
-            Op::Sin(x) => todo!(),
-            Op::Cos(x) => todo!(),
-            Op::Exp(x) => todo!(),
-            Op::Log(x) => todo!(),
             Op::Matmul(x, y) => todo!(),
             Op::Tanh(x) => todo!(),
-            Op::Mean(x) => todo!(),
-            Op::Var(x) => todo!(),
+            // Op::Sin(x) => todo!(),
+            // Op::Cos(x) => todo!(),
+            // Op::Exp(x) => todo!(),
+            // Op::Log(x) => todo!(),
+            // Op::Mean(x) => todo!(),
+            // Op::Var(x) => todo!(),
         }
     }
 
@@ -125,17 +125,39 @@ impl Mul for &Tensor {
 }
 
 impl Tensor {
+    // ***linear/non-linear***
     pub fn matmul(&self, other: &Tensor) -> Tensor {
         todo!()
     }
 
-    pub fn sin(&self) -> Tensor {
+    pub fn tanh(&self) -> Tensor {
         todo!()
     }
 
-    pub fn cos(&self) -> Tensor {
-        todo!()
-    }
+    // pub fn sigmoid(&self) -> Tensor {
+    //     todo!()
+    // }
+
+    // pub fn relu(&self) -> Tensor {
+    //     todo!()
+    // }
+
+    // pub fn gelu(&self) -> Tensor {
+    //     todo!()
+    // }
+
+    // pub fn silu(&self) -> Tensor {
+    //     todo!()
+    // }
+
+    // ***transcendental***
+    // pub fn sin(&self) -> Tensor {
+    //     todo!()
+    // }
+
+    // pub fn cos(&self) -> Tensor {
+    //     todo!()
+    // }
 
     pub fn exp(&self) -> Tensor {
         todo!()
@@ -145,17 +167,18 @@ impl Tensor {
         todo!()
     }
 
-    pub fn tanh(&self) -> Tensor {
-        todo!()
-    }
+    // ***statistics***
+    // pub fn sum(&self, dim: usize) -> Tensor {
+    //     todo!()
+    // }
 
-    pub fn mean(&self) -> Tensor {
-        todo!()
-    }
+    // pub fn mean(&self, dim: usize) -> Tensor {
+    //     todo!()
+    // }
 
-    pub fn var(&self) -> Tensor {
-        todo!()
-    }
+    // pub fn var(&self, dim: usize) -> Tensor {
+    //     todo!()
+    // }
 }
 
 // *****************************************************************************************************************
@@ -194,7 +217,7 @@ impl Tensor {
                     let mut storage = x.storage.borrow_mut();
                     match storage.grad {
                         Some(ref mut dfdx_prev) => {
-                            *dfdx_prev = &*dfdx_prev + dfdx_next;
+                            *dfdx_prev = &*dfdx_prev + dfdx_next; // todo: dfdx_next.detatch()?
                         }
                         None => {
                             storage.grad = Some(dfdx_next.clone());
@@ -245,14 +268,14 @@ impl Op {
                 vec![dx * &grad.clone(), dy * &grad.clone()]
             }
             Op::Div(x, y) => todo!(),
-            Op::Sin(x) => todo!(),
-            Op::Cos(x) => todo!(),
-            Op::Exp(x) => todo!(),
-            Op::Log(x) => todo!(),
             Op::Matmul(x, y) => todo!(),
             Op::Tanh(x) => todo!(),
-            Op::Mean(x) => todo!(),
-            Op::Var(x) => todo!(),
+            // Op::Sin(x) => todo!(),
+            // Op::Cos(x) => todo!(),
+            // Op::Exp(x) => todo!(),
+            // Op::Log(x) => todo!(),
+            // Op::Mean(x) => todo!(),
+            // Op::Var(x) => todo!(),
         }
     }
 }
