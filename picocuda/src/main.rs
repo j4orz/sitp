@@ -34,13 +34,15 @@ fn main() {
     println!("x.grad: {}", x.storage.borrow().grad.as_ref().unwrap());
     println!("y.grad: {}", y.storage.borrow().grad.as_ref().unwrap());
 
-    let x = Tensor::randn(&[2, 3]);
-    let y = Tensor::randn(&[3, 4]);
-    let mut z = x.matmul(&y);
-    z.backward();
+    let X = Tensor::randn(&[2, 3]);
+    let Y = Tensor::randn(&[3, 4]);
+    let Z = X.matmul(&Y);
+    // z.backward();
 
-    println!("z: {}", z);
-    println!("z.grad: {}", z.storage.borrow().grad.as_ref().unwrap());
-    println!("x.grad: {}", x.storage.borrow().grad.as_ref().unwrap());
-    println!("y.grad: {}", y.storage.borrow().grad.as_ref().unwrap());
+    println!("z: {}", X);
+    println!("z: {}", Y);
+    println!("z: {}", Z);
+    // println!("z.grad: {}", z.storage.borrow().grad.as_ref().unwrap());
+    // println!("x.grad: {}", x.storage.borrow().grad.as_ref().unwrap());
+    // println!("y.grad: {}", y.storage.borrow().grad.as_ref().unwrap());
 }

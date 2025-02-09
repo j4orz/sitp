@@ -135,15 +135,6 @@ impl Tensor {
 
     pub fn arange(start: f32, end: f32, step: f32) -> Self {
         todo!()
-        // let size = (end - start) / step;
-        // let data = (0..size).map(|i| start + i * step).collect::<Vec<f32>>();
-        // Tensor::new(data)
-    }
-
-    pub fn linspace(start: f32, end: f32, steps: usize) -> Self {
-        todo!()
-        // let data = (0..steps).map(|i| start + i * (end - start) / (steps - 1) as f32).collect::<Vec<f32>>();
-        // Tensor::new(data)
     }
 
     pub fn zeros(shape: &[usize]) -> Self {
