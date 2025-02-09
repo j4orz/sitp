@@ -115,17 +115,6 @@ impl Tensor {
         }
     }
 
-    /// randn returns a tensor filled with random numbers from a normal distribution
-    /// with mean 0 and variance 1 (also called the standard normal distribution)
-    ///
-    /// Examples
-    /// ```rust
-    /// let x = Tensor::randn(4);
-    /// println!("{:?}", x);
-    ///
-    /// let y = Tensor::randn(&[2, 3]);
-    /// println!("{:?}", y);
-    /// ```
     pub fn randn(shape: &[usize]) -> Self {
         let size: usize = shape.iter().product::<usize>();
         let data = (0..size)
@@ -157,16 +146,6 @@ impl Tensor {
         // Tensor::new(data)
     }
 
-    /// returns a tensor filled with the scalar value 0, with the shape defined by the variable argument size
-    ///
-    /// Examples
-    /// ```rust
-    /// let x = Tensor::zeros(&[2, 3]);
-    /// println!("{:?}", x);
-    ///
-    /// let y = Tensor::zeros(5);
-    /// println!("{:?}", y);
-    /// ```
     pub fn zeros(shape: &[usize]) -> Self {
         let size: usize = shape.iter().product::<usize>();
         Tensor {
@@ -184,16 +163,6 @@ impl Tensor {
         }
     }
 
-    /// returns a tensor filled with the scalar value 1, with the shape defined by the variable argument size
-    ///
-    /// Examples
-    /// ```rust
-    /// let x = Tensor::ones(&[2, 3]);
-    /// println!("{:?}", x);
-    ///
-    /// let y = Tensor::ones(5);
-    /// println!("{:?}", y);
-    /// ```
     pub fn ones(shape: &[usize]) -> Self {
         let size = shape.iter().product::<usize>();
         Tensor {
@@ -215,18 +184,6 @@ impl Tensor {
     // ************************************************** VIEWS ***************************************************
     // *****************************************************************************************************************
 
-    /// returns a new tensor with the same data as the self tensor but of a different shape.
-    ///
-    /// The returned tensor shares the same data and must have the same number of elements, but may have a different size.
-    /// For a tensor to be viewed, the new view size must be compatible with its original size and stride
-    /// i.e., each new view dimension must either be a subspace of an original dimension, or only span across original dimensions
-    ///
-    /// Examples
-    /// ```rust
-    /// let x = Tensor::randn(&[4, 4]);
-    /// let y = x.view(&[16]);
-    /// let z = y.view(&[-1, 8]);
-    /// ```
     pub fn view(&self, shape: &[i32]) -> Self {
         todo!()
     }
