@@ -2,7 +2,7 @@ use std::{
     cell::RefCell,
     collections::HashSet,
     hash,
-    ops::{Add, Mul},
+    ops::{Add, Div, Mul},
     rc::Rc,
 };
 
@@ -11,11 +11,10 @@ use crate::{Storage, Tensor};
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
 pub enum Op {
-    // ***desugared core*** (trascendental ops can be desugared to algebraic via power series (not taylor, contra calc teachers))
-    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), // algebraic
+    // ***desugared core***
+    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // algebraic
     // ***sugar***
-    Matmul(Tensor, Tensor), Tanh(Tensor), // linear/nonlinear
-    // Sin(Tensor), Cos(Tensor), Exp(Tensor), Log(Tensor), // transcendental
+    Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // transcendental (can be desugared to algebraic via power serie — not taylor, contra calc teachers)
     // Mean(Tensor), Var(Tensor), // statistics
     // Dot
 }
@@ -27,11 +26,11 @@ impl Op {
             Op::Add(x, y) | Op::Sub(x, y) | Op::Mul(x, y) | Op::Div(x, y) | Op::Matmul(x, y) => {
                 vec![x, y]
             }
-            Op::Tanh(x)
-            // | Op::Sin(x)
-            // | Op::Cos(x)
-            // | Op::Exp(x)
-            // | Op::Log(x)
+            | Op::Exp(x)
+            | Op::Log(x)
+            | Op::Sinh(x)
+            | Op::Cosh(x)
+            | Op::Tanh(x)
             // | Op::Mean(x) | Op::Var(x)
             => {
                 vec![x]
@@ -100,13 +99,15 @@ impl Op {
 
                 Z
             }
-            Op::Tanh(x) => todo!(),
-            // Op::Sin(x) => todo!(),
-            // Op::Cos(x) => todo!(),
-            // Op::Exp(x) => todo!(),
-            // Op::Log(x) => todo!(),
-            // Op::Mean(x) => todo!(),
-            // Op::Var(x) => todo!(),
+            Op::Exp(x) => todo!(),
+            Op::Log(x) => todo!(),
+            Op::Sinh(x) => todo!(),
+            Op::Cosh(x) => todo!(),
+            Op::Tanh(x) => {
+                let op = Op::Div(Op::Sinh(x.clone()).forward(), Op::Cosh(x.clone()).forward());
+                op.forward()
+            } // Op::Mean(x) => todo!(),
+              // Op::Var(x) => todo!(),
         }
     }
 
@@ -160,7 +161,30 @@ impl Mul for &Tensor {
     }
 }
 
+impl Div for &Tensor {
+    type Output = Tensor;
+
+    fn div(self, other: &Tensor) -> Self::Output {
+        let op = Op::Div(self.clone(), other.clone());
+        let output = op.forward();
+        output
+    }
+}
+
 impl Tensor {
+    // ***transcendental***
+    pub fn exp(&self) -> Tensor {
+        let op = Op::Exp(self.clone());
+        let output = op.forward();
+        output
+    }
+
+    pub fn log(&self) -> Tensor {
+        let op = Op::Exp(self.clone());
+        let output = op.forward();
+        output
+    }
+
     // ***linear/non-linear***
     pub fn matmul(&self, other: &Tensor) -> Tensor {
         let op = Op::Matmul(self.clone(), other.clone());
@@ -168,41 +192,22 @@ impl Tensor {
         output
     }
 
+    pub fn sinh(&self) -> Tensor {
+        let op = Op::Sinh(self.clone());
+        let output = op.forward();
+        output
+    }
+
+    pub fn cosh(&self) -> Tensor {
+        let op = Op::Cosh(self.clone());
+        let output = op.forward();
+        output
+    }
+
     pub fn tanh(&self) -> Tensor {
-        todo!()
-    }
-
-    // pub fn sigmoid(&self) -> Tensor {
-    //     todo!()
-    // }
-
-    // pub fn relu(&self) -> Tensor {
-    //     todo!()
-    // }
-
-    // pub fn gelu(&self) -> Tensor {
-    //     todo!()
-    // }
-
-    // pub fn silu(&self) -> Tensor {
-    //     todo!()
-    // }
-
-    // ***transcendental***
-    // pub fn sin(&self) -> Tensor {
-    //     todo!()
-    // }
-
-    // pub fn cos(&self) -> Tensor {
-    //     todo!()
-    // }
-
-    pub fn exp(&self) -> Tensor {
-        todo!()
-    }
-
-    pub fn log(&self) -> Tensor {
-        todo!()
+        let op = Op::Tanh(self.clone());
+        let output = op.forward();
+        output
     }
 
     // ***statistics***
@@ -307,11 +312,11 @@ impl Op {
             }
             Op::Div(x, y) => todo!(),
             Op::Matmul(x, y) => todo!(),
+            Op::Exp(x) => todo!(),
+            Op::Log(x) => todo!(),
+            Op::Sinh(x) => todo!(),
+            Op::Cosh(x) => todo!(),
             Op::Tanh(x) => todo!(),
-            // Op::Sin(x) => todo!(),
-            // Op::Cos(x) => todo!(),
-            // Op::Exp(x) => todo!(),
-            // Op::Log(x) => todo!(),
             // Op::Mean(x) => todo!(),
             // Op::Var(x) => todo!(),
         }

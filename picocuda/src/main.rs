@@ -1,23 +1,38 @@
 use picograd::Tensor;
 
 // todo for ffn:
-
-// ISA:
 // --training:
 // picograd.tensor()
 // picograd.tanh()
 // picograd.functional.cross_entropy()
+// broadcast, views, reshapes
+// detatch??
+// python bindings
+
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+
 // --inference:
 // picograd.functional.softmax()
 // picograd.randint()
 // picograd.multinomial()
 // picograd.Generator().manual_seed()
 
-// broadcast, views, reshapes
 // SIMD
-// python bindings
-// nn (made wavenet rnn lstm)
 // fuzzer
+// graphviz
 
 fn main() {
     println!(
