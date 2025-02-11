@@ -99,13 +99,62 @@ impl Op {
 
                 Z
             }
-            Op::Exp(x) => todo!(),
-            Op::Log(x) => todo!(),
-            Op::Sinh(x) => todo!(),
-            Op::Cosh(x) => todo!(),
+            Op::Exp(x) => {
+                let Z = Tensor::zeros(&x.shape);
+                {
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), Z.storage.borrow_mut());
+
+                    for (i, &xi) in x_storage.data.iter().enumerate() {
+                        z_storage.data[i] = xi.exp();
+                    }
+                }
+                Z
+            }
+            Op::Log(x) => {
+                let Z = Tensor::zeros(&x.shape);
+                {
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), Z.storage.borrow_mut());
+
+                    for (i, &xi) in x_storage.data.iter().enumerate() {
+                        z_storage.data[i] = xi.ln();
+                    }
+                }
+                Z
+            }
+            Op::Sinh(x) => {
+                let y = Tensor::zeros(&x.shape);
+                {
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
+
+                    for (i, &xi) in x_storage.data.iter().enumerate() {
+                        z_storage.data[i] = xi.sinh();
+                    }
+                }
+                y
+            }
+            Op::Cosh(x) => {
+                let y = Tensor::zeros(&x.shape);
+                {
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
+
+                    for (i, &xi) in x_storage.data.iter().enumerate() {
+                        z_storage.data[i] = xi.cosh();
+                    }
+                }
+                y
+            }
             Op::Tanh(x) => {
-                let op = Op::Div(Op::Sinh(x.clone()).forward(), Op::Cosh(x.clone()).forward());
-                op.forward()
+                // let op = Op::Div(Op::Sinh(x.clone()).forward(), Op::Cosh(x.clone()).forward());
+                // op.forward()
+                let y = Tensor::zeros(&x.shape);
+                {
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
+
+                    for (i, &xi) in x_storage.data.iter().enumerate() {
+                        z_storage.data[i] = xi.tanh();
+                    }
+                }
+                y
             } // Op::Mean(x) => todo!(),
               // Op::Var(x) => todo!(),
         }
@@ -180,7 +229,7 @@ impl Tensor {
     }
 
     pub fn log(&self) -> Tensor {
-        let op = Op::Exp(self.clone());
+        let op = Op::Log(self.clone());
         let output = op.forward();
         output
     }
@@ -211,9 +260,9 @@ impl Tensor {
     }
 
     // ***statistics***
-    // pub fn sum(&self, dim: usize) -> Tensor {
-    //     todo!()
-    // }
+    pub fn sum(&self, dim: usize, keepdim: bool) -> Tensor {
+        todo!()
+    }
 
     // pub fn mean(&self, dim: usize) -> Tensor {
     //     todo!()
