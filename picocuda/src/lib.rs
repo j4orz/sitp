@@ -104,7 +104,7 @@ impl Tensor {
 
     // todo: requires_grad: bool
     pub fn new(data: Vec<f32>) -> Self {
-        Tensor {
+        Self {
             ndim: 1,
             shape: vec![data.len()],
             stride: Self::stride(&vec![data.len()]),
@@ -122,7 +122,7 @@ impl Tensor {
             .map(|_| rand::rng().sample(StandardUniform))
             .collect::<Vec<f32>>();
 
-        Tensor {
+        Self {
             ndim: shape.len(),
             shape: shape.to_owned(),
             stride: Self::stride(shape),
@@ -140,7 +140,7 @@ impl Tensor {
 
     pub fn zeros(shape: &[usize]) -> Self {
         let size: usize = shape.iter().product::<usize>();
-        Tensor {
+        Self {
             ndim: shape.len(),
             shape: shape.to_owned(),
             stride: Self::stride(shape),
@@ -157,7 +157,7 @@ impl Tensor {
 
     pub fn ones(shape: &[usize]) -> Self {
         let size = shape.iter().product::<usize>();
-        Tensor {
+        Self {
             ndim: shape.len(),
             shape: shape.to_owned(),
             stride: Self::stride(shape),

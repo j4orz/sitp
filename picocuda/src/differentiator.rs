@@ -285,10 +285,18 @@ impl Tensor {
         output
     }
 
-    // ***statistics***
-    pub fn sum(&self, dim: usize, keepdim: bool) -> Tensor {
+    // ***reductions***
+    pub fn sum(&self, dim: i32, keepdim: bool) -> Tensor {
         todo!()
     }
+
+    // pub fn max(&self, dim: i32, keepdim: bool) -> Tensor {
+    //     todo!()
+    // }
+
+    // pub fn min(&self, dim: i32, keepdim: bool) -> Tensor {
+    //     todo!()
+    // }
 
     // pub fn mean(&self, dim: usize) -> Tensor {
     //     todo!()
