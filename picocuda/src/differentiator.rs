@@ -2,7 +2,7 @@ use std::{
     cell::RefCell,
     collections::HashSet,
     hash,
-    ops::{Add, Div, Mul},
+    ops::{Add, Div, Mul, Neg},
     rc::Rc,
 };
 
@@ -14,7 +14,7 @@ pub enum Op {
     // ***desugared core***
     Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // algebraic
     // ***sugar***
-    Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // transcendental (can be desugared to algebraic via power serie — not taylor, contra calc teachers)
+    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // transcendental (can be desugared to algebraic via power serie — not taylor, contra calc teachers)
     // Mean(Tensor), Var(Tensor), // statistics
     // Dot
 }
@@ -26,6 +26,7 @@ impl Op {
             Op::Add(x, y) | Op::Sub(x, y) | Op::Mul(x, y) | Op::Div(x, y) | Op::Matmul(x, y) => {
                 vec![x, y]
             }
+            Op::Neg(x)
             | Op::Exp(x)
             | Op::Log(x)
             | Op::Sinh(x)
@@ -99,27 +100,42 @@ impl Op {
 
                 Z
             }
-            Op::Exp(x) => {
-                let Z = Tensor::zeros(&x.shape);
+            Op::Neg(x) => {
+                // TODO?: can desugar to mul, just like tanh(x) := div(sinh(x), cosh(x))
+                // let op = Op::Mul(x.clone(), Tensor::new(vec![-1.0; x.numel()]));
+                // let y = op.forward();
+                // y
+                let y = Tensor::zeros(&x.shape);
                 {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), Z.storage.borrow_mut());
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
+
+                    for (i, &xi) in x_storage.data.iter().enumerate() {
+                        z_storage.data[i] = -xi;
+                    }
+                }
+                y
+            }
+            Op::Exp(x) => {
+                let y = Tensor::zeros(&x.shape);
+                {
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
 
                     for (i, &xi) in x_storage.data.iter().enumerate() {
                         z_storage.data[i] = xi.exp();
                     }
                 }
-                Z
+                y
             }
             Op::Log(x) => {
-                let Z = Tensor::zeros(&x.shape);
+                let y = Tensor::zeros(&x.shape);
                 {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), Z.storage.borrow_mut());
+                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
 
                     for (i, &xi) in x_storage.data.iter().enumerate() {
                         z_storage.data[i] = xi.ln();
                     }
                 }
-                Z
+                y
             }
             Op::Sinh(x) => {
                 let y = Tensor::zeros(&x.shape);
@@ -187,6 +203,16 @@ impl Op {
             layout: x.layout.clone(),
             dtype: x.dtype.clone(),
         }
+    }
+}
+
+impl Neg for &Tensor {
+    type Output = Tensor;
+
+    fn neg(self) -> Self::Output {
+        let op = Op::Neg(self.clone());
+        let output = op.forward();
+        output
     }
 }
 
@@ -361,6 +387,7 @@ impl Op {
             }
             Op::Div(x, y) => todo!(),
             Op::Matmul(x, y) => todo!(),
+            Op::Neg(x) => todo!(),
             Op::Exp(x) => todo!(),
             Op::Log(x) => todo!(),
             Op::Sinh(x) => todo!(),
