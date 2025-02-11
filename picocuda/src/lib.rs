@@ -6,6 +6,7 @@ use rand::Rng;
 use std::{
     cell::RefCell,
     fmt::{self, Display},
+    io,
     rc::Rc,
 };
 
@@ -102,26 +103,7 @@ impl Tensor {
         stride
     }
 
-    // todo: requires_grad: bool
-    pub fn new(data: Vec<f32>) -> Self {
-        Self {
-            ndim: 1,
-            shape: vec![data.len()],
-            stride: Self::stride(&vec![data.len()]),
-            input_op: None,
-            storage: Rc::new(RefCell::new(Storage { data, grad: None })),
-            device: Device::Cpu,
-            layout: Layout::Strided,
-            dtype: Dtype::Float32,
-        }
-    }
-
-    pub fn randn(shape: &[usize]) -> Self {
-        let size: usize = shape.iter().product::<usize>();
-        let data = (0..size)
-            .map(|_| rand::rng().sample(StandardUniform))
-            .collect::<Vec<f32>>();
-
+    fn alloc(shape: &[usize], data: Vec<f32>) -> Self {
         Self {
             ndim: shape.len(),
             shape: shape.to_owned(),
@@ -132,53 +114,41 @@ impl Tensor {
             layout: Layout::Strided,
             dtype: Dtype::Float32,
         }
+    }
+
+    // todo: requires_grad: bool
+    pub fn new(data: Vec<f32>) -> Self {
+        Self::alloc(&vec![data.len()], data)
+    }
+
+    pub fn zeros(shape: &[usize]) -> Self {
+        let n = shape.iter().product();
+        let data = vec![0.0; n];
+        Self::alloc(shape, data)
+    }
+
+    pub fn ones(shape: &[usize]) -> Self {
+        let n = shape.iter().product();
+        let data = vec![1.0; n];
+        Self::alloc(shape, data)
+    }
+
+    pub fn randn(shape: &[usize]) -> Self {
+        let n: usize = shape.iter().product::<usize>();
+        let data = (0..n)
+            .map(|_| rand::rng().sample(StandardUniform))
+            .collect::<Vec<f32>>();
+
+        Self::alloc(shape, data)
     }
 
     pub fn arange(start: f32, end: f32, step: f32) -> Self {
         todo!()
     }
 
-    pub fn zeros(shape: &[usize]) -> Self {
-        let size: usize = shape.iter().product::<usize>();
-        Self {
-            ndim: shape.len(),
-            shape: shape.to_owned(),
-            stride: Self::stride(shape),
-            input_op: None,
-            storage: Rc::new(RefCell::new(Storage {
-                data: vec![0.0; size],
-                grad: None,
-            })),
-            device: Device::Cpu,
-            layout: Layout::Strided,
-            dtype: Dtype::Float32,
-        }
-    }
-
-    pub fn ones(shape: &[usize]) -> Self {
-        let size = shape.iter().product::<usize>();
-        Self {
-            ndim: shape.len(),
-            shape: shape.to_owned(),
-            stride: Self::stride(shape),
-            input_op: None,
-            storage: Rc::new(RefCell::new(Storage {
-                data: vec![1.0; size],
-                grad: None,
-            })),
-            device: Device::Cpu,
-            layout: Layout::Strided,
-            dtype: Dtype::Float32,
-        }
-    }
-
     // *****************************************************************************************************************
     // ************************************************** VIEWS ***************************************************
     // *****************************************************************************************************************
-
-    pub fn view(&self, shape: &[i32]) -> Self {
-        todo!()
-    }
 
     pub fn permute(&self, shape: &[usize]) -> Self {
         let new_shape = shape.iter().map(|&old_dim| self.shape[old_dim]).collect();
@@ -196,16 +166,21 @@ impl Tensor {
         }
     }
 
-    pub fn reshape(&self, shape: &[usize]) -> Self {
+    pub fn view(&self, shape: &[i32]) -> Self {
+        todo!()
+    }
+
+    pub fn reshape(&self, shape: &[usize]) -> Result<Self, io::Error> {
         let new_size = shape.iter().product::<usize>();
 
-        // assert_eq!(
-        //     self.numel(),
-        //     new_size,
-        //     "new shape must have same number of elements as current shape"
-        // );
+        if self.numel() != new_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "new shape must have same number of elements as current shape",
+            ));
+        }
 
-        Self {
+        Ok(Self {
             ndim: shape.len(),
             shape: shape.to_owned(),
             stride: Self::stride(shape),
@@ -214,7 +189,7 @@ impl Tensor {
             device: self.device.clone(),
             layout: self.layout.clone(),
             dtype: self.dtype.clone(),
-        }
+        })
     }
 
     fn format(
