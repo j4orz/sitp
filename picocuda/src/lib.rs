@@ -9,6 +9,7 @@ use std::{
     rc::Rc,
 };
 
+pub mod functional;
 // pub mod nn;
 
 // - lifetime: deallocation semantics
@@ -179,12 +180,41 @@ impl Tensor {
         todo!()
     }
 
-    pub fn permute(&self) -> Self {
-        todo!()
+    pub fn permute(&self, shape: &[usize]) -> Self {
+        let new_shape = shape.iter().map(|&old_dim| self.shape[old_dim]).collect();
+        let new_stride = shape.iter().map(|&old_dim| self.stride[old_dim]).collect();
+
+        Self {
+            ndim: self.ndim,
+            shape: new_shape,
+            stride: new_stride,
+            input_op: None,
+            storage: self.storage.clone(),
+            device: self.device.clone(),
+            layout: self.layout.clone(),
+            dtype: self.dtype.clone(),
+        }
     }
 
-    pub fn reshape(&self) -> Self {
-        todo!()
+    pub fn reshape(&self, shape: &[usize]) -> Self {
+        let new_size = shape.iter().product::<usize>();
+
+        // assert_eq!(
+        //     self.numel(),
+        //     new_size,
+        //     "new shape must have same number of elements as current shape"
+        // );
+
+        Self {
+            ndim: shape.len(),
+            shape: shape.to_owned(),
+            stride: Self::stride(shape),
+            input_op: None,
+            storage: self.storage.clone(), // Rc::clone()
+            device: self.device.clone(),
+            layout: self.layout.clone(),
+            dtype: self.dtype.clone(),
+        }
     }
 
     fn format(

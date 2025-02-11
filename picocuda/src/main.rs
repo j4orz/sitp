@@ -1,38 +1,25 @@
 use picograd::Tensor;
 
-// todo for ffn:
-// --training:
-// picograd.tensor()
-// picograd.tanh()
-// picograd.functional.cross_entropy()
-// broadcast, views, reshapes
-// detatch??
-// python bindings
+// TODO SECTION 1 PART 1: CORE
+// TENSOR
+// ---------
+// - broadcast, views, reshapes
+// - detatch??
+// - graphviz/ascii print
+
+// SYSTEMS
+// ---------
+// fuzzer. SIMD
+// static? jax : https://docs.jax.dev/en/latest/autodidax.html
 
 //
 //
 //
 //
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-// --inference:
-// picograd.functional.softmax()
-// picograd.randint()
-// picograd.multinomial()
-// picograd.Generator().manual_seed()
-
-// SIMD
-// fuzzer
-// graphviz
+// rng (inference)
+// - picograd.randint()
+// - picograd.multinomial()
+// - picograd.Generator().manual_seed()
 
 fn main() {
     println!(
