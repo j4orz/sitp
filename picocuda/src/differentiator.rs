@@ -1,3 +1,4 @@
+use crate::{Storage, Tensor};
 use std::{
     cell::RefCell,
     collections::HashSet,
@@ -5,17 +6,16 @@ use std::{
     ops::{Add, Div, Mul, Neg},
     rc::Rc,
 };
-
-use crate::{Storage, Tensor};
+use thiserror::Error;
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
 pub enum Op {
     // ***desugared core***
-    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // algebraic
+    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binary maps: algebraic
     // ***sugar***
     // (can be desugared to algebraic via power series — contra calc teachers taylor series)
-    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // transcendental
+    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // unary zips: transcendental
     Sum(Tensor, usize, bool),
     // Mean(Tensor), Var(Tensor), // statistics
     // Dot
@@ -38,6 +38,7 @@ impl Op {
             => {
                 vec![x]
             }
+            Op::Sum(x, _, _) => vec![x],
         }
     }
 }
@@ -60,8 +61,16 @@ impl hash::Hash for Op {
 // ******************************************** .forward() *********************************************
 // *****************************************************************************************************************
 
+#[derive(Error, Debug)]
+pub enum OpForwardError {
+    #[error("shape mismatch in operation: expected {expected:?}, found {found:?}")]
+    ShapeMismatch { expected: String, found: String },
+    #[error("unknown operation error")]
+    Unknown,
+}
+
 impl Op {
-    fn forward(&self) -> Tensor {
+    fn forward(&self) -> Result<Tensor, OpForwardError> {
         match &self {
             Op::Add(x, y) => self.zip(|xi, yi| xi + yi, x, y),
             Op::Sub(x, y) => self.zip(|xi, yi| xi - yi, x, y),
@@ -77,11 +86,13 @@ impl Op {
             Op::Sinh(x) => self.map(|xi| xi.sinh(), x),
             Op::Cosh(x) => self.map(|xi| xi.cosh(), x),
             Op::Tanh(x) => self.map(|xi| xi.tanh(), x),
-            // Op::Mean(x) => todo!(),
-            // Op::Var(x) => todo!(),
-            Op::Sum(x, dim, keepdim) => {
-                todo!()
-            }
+            // sigmoid
+            // relu
+            Op::Sum(x, dim, keepdim) => self.reduce(x, *dim, *keepdim),
+            // max
+            // min
+            // mean
+            // var
             Op::Matmul(X, Y) => {
                 // 1. def O(n^3)
                 // 2. data oriented(cache)/pthreads/SIMD
@@ -115,16 +126,16 @@ impl Op {
                     }
                 }
 
-                Z
+                Ok(Z)
             }
         }
     }
 
-    fn map<F>(&self, f: F, x: &Tensor) -> Tensor
+    fn map<F>(&self, f: F, x: &Tensor) -> Result<Tensor, OpForwardError>
     where
         F: Fn(f32) -> f32,
     {
-        Tensor {
+        Ok(Tensor {
             ndim: x.ndim,
             shape: x.shape.clone(),
             stride: x.stride.clone(),
@@ -137,16 +148,31 @@ impl Op {
             device: x.device.clone(),
             layout: x.layout.clone(),
             dtype: x.dtype.clone(),
-        }
+        })
     }
 
-    fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Tensor
+    fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Result<Tensor, OpForwardError>
     where
         F: Fn(f32, f32) -> f32,
     {
-        assert_eq!(x.shape, y.shape, "Shape mismatch in operation");
+        if x.shape != y.shape {
+            return Err(OpForwardError::ShapeMismatch {
+                expected: x
+                    .shape
+                    .iter()
+                    .map(|&s| s.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                found: y
+                    .shape
+                    .iter()
+                    .map(|&s| s.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            });
+        }
 
-        Tensor {
+        Ok(Tensor {
             ndim: x.ndim,
             shape: x.shape.clone(),
             stride: x.stride.clone(),
@@ -166,12 +192,16 @@ impl Op {
             device: x.device.clone(),
             layout: x.layout.clone(),
             dtype: x.dtype.clone(),
-        }
+        })
+    }
+
+    fn reduce(&self, x: &Tensor, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
+        todo!()
     }
 }
 
 impl Neg for &Tensor {
-    type Output = Tensor;
+    type Output = Result<Tensor, OpForwardError>;
 
     fn neg(self) -> Self::Output {
         let op = Op::Neg(self.clone());
@@ -181,7 +211,7 @@ impl Neg for &Tensor {
 }
 
 impl Add for &Tensor {
-    type Output = Tensor;
+    type Output = Result<Tensor, OpForwardError>;
 
     fn add(self, input_other: &Tensor) -> Self::Output {
         let op = Op::Add(self.clone(), input_other.clone());
@@ -191,7 +221,7 @@ impl Add for &Tensor {
 }
 
 impl Mul for &Tensor {
-    type Output = Tensor;
+    type Output = Result<Tensor, OpForwardError>;
 
     fn mul(self, other: &Tensor) -> Self::Output {
         let op = Op::Mul(self.clone(), other.clone());
@@ -212,7 +242,7 @@ impl Mul for &Tensor {
 // }
 
 impl Div for &Tensor {
-    type Output = Tensor;
+    type Output = Result<Tensor, OpForwardError>;
 
     fn div(self, other: &Tensor) -> Self::Output {
         let op = Op::Div(self.clone(), other.clone());
@@ -223,63 +253,63 @@ impl Div for &Tensor {
 
 impl Tensor {
     // ***transcendental***
-    pub fn exp(&self) -> Tensor {
+    pub fn exp(&self) -> Result<Tensor, OpForwardError> {
         let op = Op::Exp(self.clone());
         let output = op.forward();
         output
     }
 
-    pub fn log(&self) -> Tensor {
+    pub fn log(&self) -> Result<Tensor, OpForwardError> {
         let op = Op::Log(self.clone());
         let output = op.forward();
         output
     }
 
     // ***linear/non-linear***
-    pub fn matmul(&self, other: &Tensor) -> Tensor {
+    pub fn matmul(&self, other: &Tensor) -> Result<Tensor, OpForwardError> {
         let op = Op::Matmul(self.clone(), other.clone());
         let output = op.forward();
         output
     }
 
-    pub fn sinh(&self) -> Tensor {
+    pub fn sinh(&self) -> Result<Tensor, OpForwardError> {
         let op = Op::Sinh(self.clone());
         let output = op.forward();
         output
     }
 
-    pub fn cosh(&self) -> Tensor {
+    pub fn cosh(&self) -> Result<Tensor, OpForwardError> {
         let op = Op::Cosh(self.clone());
         let output = op.forward();
         output
     }
 
-    pub fn tanh(&self) -> Tensor {
+    pub fn tanh(&self) -> Result<Tensor, OpForwardError> {
         let op = Op::Tanh(self.clone());
         let output = op.forward();
         output
     }
 
     // ***reductions***
-    pub fn sum(&self, dim: usize, keepdim: bool) -> Tensor {
+    pub fn sum(&self, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
         let op = Op::Sum(self.clone(), dim, keepdim);
         let output = op.forward();
         output
     }
 
-    // pub fn max(&self, dim: i32, keepdim: bool) -> Tensor {
+    // pub fn max(&self, dim: i32, keepdim: bool) -> Result<Tensor, OpForwardError> {
     //     todo!()
     // }
 
-    // pub fn min(&self, dim: i32, keepdim: bool) -> Tensor {
+    // pub fn min(&self, dim: i32, keepdim: bool) -> Result<Tensor, OpForwardError> {
     //     todo!()
     // }
 
-    // pub fn mean(&self, dim: usize) -> Tensor {
+    // pub fn mean(&self, dim: usize) -> Result<Tensor, OpForwardError> {
     //     todo!()
     // }
 
-    // pub fn var(&self, dim: usize) -> Tensor {
+    // pub fn var(&self, dim: usize) -> Result<Tensor, OpForwardError> {
     //     todo!()
     // }
 }
@@ -320,7 +350,7 @@ impl Tensor {
                     let mut storage = x.storage.borrow_mut();
                     match storage.grad {
                         Some(ref mut dfdx_prev) => {
-                            *dfdx_prev = &*dfdx_prev + dfdx_next; // todo: dfdx_next.detatch()?
+                            *dfdx_prev = (&*dfdx_prev + dfdx_next).unwrap(); // todo: dfdx_next.detatch()?
                         }
                         None => {
                             storage.grad = Some(dfdx_next.clone());
@@ -355,7 +385,10 @@ impl Op {
             Op::Add(_x, _y) => {
                 // d/dx(x + y) = 1, d/dy(x + y) = 1
                 let (dx, dy) = (Tensor::ones(&grad.shape), Tensor::ones(&grad.shape));
-                vec![&dx * &grad.clone(), &dy * &grad.clone()]
+                vec![
+                    (&dx * &grad.clone()).unwrap(),
+                    (&dy * &grad.clone()).unwrap(),
+                ]
             }
             Op::Sub(_x, _y) => {
                 // d/dx(x - y) = 1, d/dy(x - y) = -1
@@ -363,15 +396,17 @@ impl Op {
                     Tensor::ones(&grad.shape),
                     Tensor::new(vec![-1.0; grad.numel()]),
                 );
-                vec![&dx * &grad.clone(), &dy * &grad.clone()]
+                vec![
+                    (&dx * &grad.clone()).unwrap(),
+                    (&dy * &grad.clone()).unwrap(),
+                ]
             }
             Op::Mul(x, y) => {
                 // d/dx(x * y) = y, d/dy(x * y) = x
                 let (dx, dy) = (y, x);
-                vec![dx * &grad.clone(), dy * &grad.clone()]
+                vec![(dx * &grad.clone()).unwrap(), (dy * &grad.clone()).unwrap()]
             }
             Op::Div(x, y) => todo!(),
-            Op::Matmul(x, y) => todo!(),
             Op::Neg(x) => todo!(),
             Op::Exp(x) => todo!(),
             Op::Log(x) => todo!(),
@@ -380,6 +415,8 @@ impl Op {
             Op::Tanh(x) => todo!(),
             // Op::Mean(x) => todo!(),
             // Op::Var(x) => todo!(),
+            Op::Matmul(x, y) => todo!(),
+            Op::Sum(tensor, _, _) => todo!(),
         }
     }
 }

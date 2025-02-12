@@ -1,17 +1,29 @@
 use picograd::Tensor;
 
-// SECTION 1 PART 1: CORE
-// TENSOR/OPS: FORWARD/BACKWARD (assignment 3 dlsyscourse)
-// - .forward() 1. tiled matmul? 2. crossentropy/softmax -> reduce: .sum() -> view: reshape/permute (todo: Results) START HERE
-// - .backward() for everything
-// - SIMD > CUDA: assignment 3: https://colab.research.google.com/github/dlsyscourse/hw3/blob/main/hw3.ipynb#scrollTo=35e1e9c0
-
-// engine:
-// - assignment 1: https://colab.research.google.com/github/dlsyscourse/hw1/blob/main/hw1.ipynb#scrollTo=bNSqZVv9cE_b
-// - https://pytorch.org/docs/stable/notes/autograd.html
+// singularity systems course notes
+// ================================
 
 // - assignment 0: https://colab.research.google.com/github/dlsyscourse/hw0/blob/main/hw0.ipynb#scrollTo=KmqZjTlPeI91
+// - https://minitorch.github.io/mlprimer/#neural-networks
+// - https://minitorch.github.io/module0/module0/
 
+// section 1: FOUNDATIONS
+// * we build the wide hip and build up the lego block abstractions for ai researchers
+// * before we drill down into the metal
+
+// part 1: core
+// tensor: logical(shape,stride,input_op), storage(data, grad) physical(device,layout,dtype)
+//   tensor methods: indexing/broadcasting/views
+// ops: forward(map,zip,reduce), backward(chain rule on tensor graph)
+//                 - assignment 1: https://colab.research.google.com/github/dlsyscourse/hw1/blob/main/hw1.ipynb#scrollTo=bNSqZVv9cE_b
+//                 - https://pytorch.org/docs/stable/notes/autograd.html
+//                 - mintorch: https://minitorch.github.io/module1/module1/
+// taste of speed: SIMD: https://colab.research.google.com/github/dlsyscourse/hw3/blob/main/hw3.ipynb#scrollTo=35e1e9c0
+// taste of abstraction (few lines): cross_entropy_loss()/softmax()
+
+// part 2: nn
+// assignment 2: https://colab.research.google.com/github/dlsyscourse/hw2/blob/main/hw2.ipynb#scrollTo=Fx4GG0VrcFMQ
+// https://minitorch.github.io/module4/module4/
 //
 //
 //
@@ -32,7 +44,6 @@ use picograd::Tensor;
 // - https://pytorch.org/docs/stable/notes/randomness.html
 
 // SECTION 1 PART 2: NN
-// assignment 2: https://colab.research.google.com/github/dlsyscourse/hw2/blob/main/hw2.ipynb#scrollTo=Fx4GG0VrcFMQ
 
 fn main() {
     println!(
@@ -50,7 +61,7 @@ fn main() {
 
     let x = Tensor::new(vec![9.0]);
     let y = Tensor::new(vec![10.0]);
-    let mut z = &x + &y;
+    let mut z = (&x + &y).unwrap();
     z.backward();
 
     println!("z: {}", z);
@@ -60,7 +71,7 @@ fn main() {
 
     let x = Tensor::new(vec![9.0]);
     let y = Tensor::new(vec![10.0]);
-    let mut z = &x * &y;
+    let mut z = (&x * &y).unwrap();
     z.backward();
 
     println!("z: {}", z);
@@ -70,7 +81,7 @@ fn main() {
 
     let X = Tensor::randn(&[2, 3]);
     let Y = Tensor::randn(&[3, 4]);
-    let Z = X.matmul(&Y);
+    let Z = X.matmul(&Y).unwrap();
     // z.backward();
 
     println!("z: {}", X);
