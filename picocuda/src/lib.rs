@@ -83,26 +83,6 @@ impl Tensor {
     // ********************************************* CONSTRUCTORS (alloc) **********************************************
     // *****************************************************************************************************************
 
-    fn numel(&self) -> usize {
-        self.shape.iter().product::<usize>()
-    }
-
-    fn stride(shape: &[usize]) -> Vec<usize> {
-        let stride = shape
-            .iter()
-            .rev()
-            .fold((vec![], 1), |(mut strides, acc), &dim| {
-                strides.push(acc);
-                (strides, acc * dim)
-            })
-            .0
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>();
-
-        stride
-    }
-
     fn alloc(shape: &[usize], data: Vec<f32>) -> Self {
         Self {
             ndim: shape.len(),
@@ -189,6 +169,11 @@ impl Tensor {
         Ok(self.no_alloc(shape))
     }
 
+    pub fn detach(&self) -> Self {
+        // self.no_alloc(&self.shape)
+        todo!()
+    }
+
     fn format(
         &self,
         fmt: &mut fmt::Formatter<'_>,
@@ -220,6 +205,31 @@ impl Tensor {
             }
             _ => panic!(),
         }
+    }
+}
+
+// *****************************************************************************************************************
+// ************************************************** HELPERS ***************************************************
+// *****************************************************************************************************************
+impl Tensor {
+    fn numel(&self) -> usize {
+        self.shape.iter().product::<usize>()
+    }
+
+    fn stride(shape: &[usize]) -> Vec<usize> {
+        let stride = shape
+            .iter()
+            .rev()
+            .fold((vec![], 1), |(mut strides, acc), &dim| {
+                strides.push(acc);
+                (strides, acc * dim)
+            })
+            .0
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>();
+
+        stride
     }
 }
 

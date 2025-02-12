@@ -1,25 +1,38 @@
 use picograd::Tensor;
 
-// TODO SECTION 1 PART 1: CORE
-// TENSOR
-// ---------
-// - broadcast, views, reshapes
-// - detatch??
+// SECTION 1 PART 1: CORE
+// TENSOR/OPS: FORWARD/BACKWARD (assignment 3 dlsyscourse)
+// - .forward() 1. tiled matmul? 2. crossentropy/softmax -> reduce: .sum() -> view: reshape/permute (todo: Results) START HERE
+// - .backward() for everything
+// - SIMD > CUDA: assignment 3: https://colab.research.google.com/github/dlsyscourse/hw3/blob/main/hw3.ipynb#scrollTo=35e1e9c0
+
+// engine:
+// - assignment 1: https://colab.research.google.com/github/dlsyscourse/hw1/blob/main/hw1.ipynb#scrollTo=bNSqZVv9cE_b
+// - https://pytorch.org/docs/stable/notes/autograd.html
+
+// - assignment 0: https://colab.research.google.com/github/dlsyscourse/hw0/blob/main/hw0.ipynb#scrollTo=KmqZjTlPeI91
+
+//
+//
+//
+//
+//
+// GLUE
+// - use detach view op in autograd
 // - graphviz/ascii print
-
-// SYSTEMS
-// ---------
-// fuzzer. SIMD
+// - fuzzer
+//      - https://pytorch.org/docs/stable/notes/numerical_accuracy.html
 // static? jax : https://docs.jax.dev/en/latest/autodidax.html
+// - pyo3 bindings
 
-//
-//
-//
-//
-// rng (inference)
+// inference (rng)
 // - picograd.randint()
 // - picograd.multinomial()
 // - picograd.Generator().manual_seed()
+// - https://pytorch.org/docs/stable/notes/randomness.html
+
+// SECTION 1 PART 2: NN
+// assignment 2: https://colab.research.google.com/github/dlsyscourse/hw2/blob/main/hw2.ipynb#scrollTo=Fx4GG0VrcFMQ
 
 fn main() {
     println!(

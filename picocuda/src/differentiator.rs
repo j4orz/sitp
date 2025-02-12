@@ -14,7 +14,9 @@ pub enum Op {
     // ***desugared core***
     Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // algebraic
     // ***sugar***
-    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // transcendental (can be desugared to algebraic via power serie — not taylor, contra calc teachers)
+    // (can be desugared to algebraic via power series — contra calc teachers taylor series)
+    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // transcendental
+    Sum(Tensor, usize, bool),
     // Mean(Tensor), Var(Tensor), // statistics
     // Dot
 }
@@ -61,10 +63,22 @@ impl hash::Hash for Op {
 impl Op {
     fn forward(&self) -> Tensor {
         match &self {
-            Op::Add(x, y) => self.apply_binary_op(|xi, yi| xi + yi, x, y),
-            Op::Sub(x, y) => self.apply_binary_op(|xi, yi| xi - yi, x, y),
-            Op::Mul(x, y) => self.apply_binary_op(|xi, yi| xi * yi, x, y),
-            Op::Div(x, y) => self.apply_binary_op(|xi, yi| xi / yi, x, y),
+            Op::Add(x, y) => self.forward_pw_binop(|xi, yi| xi + yi, x, y),
+            Op::Sub(x, y) => self.forward_pw_binop(|xi, yi| xi - yi, x, y),
+            Op::Mul(x, y) => self.forward_pw_binop(|xi, yi| xi * yi, x, y),
+            Op::Div(x, y) => self.forward_pw_binop(|xi, yi| xi / yi, x, y),
+            // TODO?: can desugar to mul, just like tanh(x) := div(sinh(x), cosh(x))
+            // let op = Op::Mul(x.clone(), Tensor::new(vec![-1.0; x.numel()]));
+            // let y = op.forward();
+            // y
+            Op::Neg(x) => self.forward_pw_unop(|xi| -xi, x),
+            Op::Exp(x) => self.forward_pw_unop(|xi| xi.exp(), x),
+            Op::Log(x) => self.forward_pw_unop(|xi| xi.ln(), x),
+            Op::Sinh(x) => self.forward_pw_unop(|xi| xi.sinh(), x),
+            Op::Cosh(x) => self.forward_pw_unop(|xi| xi.cosh(), x),
+            Op::Tanh(x) => self.forward_pw_unop(|xi| xi.tanh(), x),
+            // Op::Mean(x) => todo!(),
+            // Op::Var(x) => todo!(),
             Op::Matmul(X, Y) => {
                 // 1. def O(n^3)
                 // 2. data oriented(cache)/pthreads/SIMD
@@ -100,83 +114,30 @@ impl Op {
 
                 Z
             }
-            Op::Neg(x) => {
-                // TODO?: can desugar to mul, just like tanh(x) := div(sinh(x), cosh(x))
-                // let op = Op::Mul(x.clone(), Tensor::new(vec![-1.0; x.numel()]));
-                // let y = op.forward();
-                // y
-                let y = Tensor::zeros(&x.shape);
-                {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
-
-                    for (i, &xi) in x_storage.data.iter().enumerate() {
-                        z_storage.data[i] = -xi;
-                    }
-                }
-                y
-            }
-            Op::Exp(x) => {
-                let y = Tensor::zeros(&x.shape);
-                {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
-
-                    for (i, &xi) in x_storage.data.iter().enumerate() {
-                        z_storage.data[i] = xi.exp();
-                    }
-                }
-                y
-            }
-            Op::Log(x) => {
-                let y = Tensor::zeros(&x.shape);
-                {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
-
-                    for (i, &xi) in x_storage.data.iter().enumerate() {
-                        z_storage.data[i] = xi.ln();
-                    }
-                }
-                y
-            }
-            Op::Sinh(x) => {
-                let y = Tensor::zeros(&x.shape);
-                {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
-
-                    for (i, &xi) in x_storage.data.iter().enumerate() {
-                        z_storage.data[i] = xi.sinh();
-                    }
-                }
-                y
-            }
-            Op::Cosh(x) => {
-                let y = Tensor::zeros(&x.shape);
-                {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
-
-                    for (i, &xi) in x_storage.data.iter().enumerate() {
-                        z_storage.data[i] = xi.cosh();
-                    }
-                }
-                y
-            }
-            Op::Tanh(x) => {
-                // let op = Op::Div(Op::Sinh(x.clone()).forward(), Op::Cosh(x.clone()).forward());
-                // op.forward()
-                let y = Tensor::zeros(&x.shape);
-                {
-                    let (x_storage, mut z_storage) = (x.storage.borrow(), y.storage.borrow_mut());
-
-                    for (i, &xi) in x_storage.data.iter().enumerate() {
-                        z_storage.data[i] = xi.tanh();
-                    }
-                }
-                y
-            } // Op::Mean(x) => todo!(),
-              // Op::Var(x) => todo!(),
         }
     }
 
-    fn apply_binary_op<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Tensor
+    fn forward_pw_unop<F>(&self, f: F, x: &Tensor) -> Tensor
+    where
+        F: Fn(f32) -> f32,
+    {
+        Tensor {
+            ndim: x.ndim,
+            shape: x.shape.clone(),
+            stride: x.stride.clone(),
+            input_op: Some(Box::new(self.clone())), // Box since Op owns Tensors
+            // alloc new storage
+            storage: Rc::new(RefCell::new(Storage {
+                data: x.storage.borrow().data.iter().map(|&xi| f(xi)).collect(),
+                grad: None,
+            })),
+            device: x.device.clone(),
+            layout: x.layout.clone(),
+            dtype: x.dtype.clone(),
+        }
+    }
+
+    fn forward_pw_binop<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Tensor
     where
         F: Fn(f32, f32) -> f32,
     {
@@ -236,6 +197,17 @@ impl Mul for &Tensor {
     }
 }
 
+// #[derive(Clone, Copy, Debug)]
+// pub struct Scalar(pub f32); // how does wrapper type interop with pyo3 bindings?
+
+// impl Mul<&Tensor> for Scalar {
+//     type Output = Tensor;
+
+//     fn mul(self, rhs: Self) -> Self::Output {
+//         todo!()
+//     }
+// }
+
 impl Div for &Tensor {
     type Output = Tensor;
 
@@ -286,8 +258,10 @@ impl Tensor {
     }
 
     // ***reductions***
-    pub fn sum(&self, dim: i32, keepdim: bool) -> Tensor {
-        todo!()
+    pub fn sum(&self, dim: usize, keepdim: bool) -> Tensor {
+        let op = Op::Sum(self.clone(), dim, keepdim);
+        let output = op.forward();
+        output
     }
 
     // pub fn max(&self, dim: i32, keepdim: bool) -> Tensor {
@@ -311,7 +285,7 @@ impl Tensor {
 // ******************************************** .backward() *********************************************
 // *****************************************************************************************************************
 
-// autodifferentiation is algorithmic but uses numeric objects, not symbolic.
+// autodifferentiation is algorithmic but uses numerical objects, not symbolic.
 impl Tensor {
     // forward mode: implicit graph: (V,E) = [f(x)=TODO, (f'(x)=path_i)edge_i]
     // backward mode: explicit graph 1. .forward() 2. .backward()
