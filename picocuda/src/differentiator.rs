@@ -63,22 +63,25 @@ impl hash::Hash for Op {
 impl Op {
     fn forward(&self) -> Tensor {
         match &self {
-            Op::Add(x, y) => self.forward_pw_binop(|xi, yi| xi + yi, x, y),
-            Op::Sub(x, y) => self.forward_pw_binop(|xi, yi| xi - yi, x, y),
-            Op::Mul(x, y) => self.forward_pw_binop(|xi, yi| xi * yi, x, y),
-            Op::Div(x, y) => self.forward_pw_binop(|xi, yi| xi / yi, x, y),
+            Op::Add(x, y) => self.zip(|xi, yi| xi + yi, x, y),
+            Op::Sub(x, y) => self.zip(|xi, yi| xi - yi, x, y),
+            Op::Mul(x, y) => self.zip(|xi, yi| xi * yi, x, y),
+            Op::Div(x, y) => self.zip(|xi, yi| xi / yi, x, y),
             // TODO?: can desugar to mul, just like tanh(x) := div(sinh(x), cosh(x))
             // let op = Op::Mul(x.clone(), Tensor::new(vec![-1.0; x.numel()]));
             // let y = op.forward();
             // y
-            Op::Neg(x) => self.forward_pw_unop(|xi| -xi, x),
-            Op::Exp(x) => self.forward_pw_unop(|xi| xi.exp(), x),
-            Op::Log(x) => self.forward_pw_unop(|xi| xi.ln(), x),
-            Op::Sinh(x) => self.forward_pw_unop(|xi| xi.sinh(), x),
-            Op::Cosh(x) => self.forward_pw_unop(|xi| xi.cosh(), x),
-            Op::Tanh(x) => self.forward_pw_unop(|xi| xi.tanh(), x),
+            Op::Neg(x) => self.map(|xi| -xi, x),
+            Op::Exp(x) => self.map(|xi| xi.exp(), x),
+            Op::Log(x) => self.map(|xi| xi.ln(), x),
+            Op::Sinh(x) => self.map(|xi| xi.sinh(), x),
+            Op::Cosh(x) => self.map(|xi| xi.cosh(), x),
+            Op::Tanh(x) => self.map(|xi| xi.tanh(), x),
             // Op::Mean(x) => todo!(),
             // Op::Var(x) => todo!(),
+            Op::Sum(x, dim, keepdim) => {
+                todo!()
+            }
             Op::Matmul(X, Y) => {
                 // 1. def O(n^3)
                 // 2. data oriented(cache)/pthreads/SIMD
@@ -117,7 +120,7 @@ impl Op {
         }
     }
 
-    fn forward_pw_unop<F>(&self, f: F, x: &Tensor) -> Tensor
+    fn map<F>(&self, f: F, x: &Tensor) -> Tensor
     where
         F: Fn(f32) -> f32,
     {
@@ -137,7 +140,7 @@ impl Op {
         }
     }
 
-    fn forward_pw_binop<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Tensor
+    fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Tensor
     where
         F: Fn(f32, f32) -> f32,
     {
