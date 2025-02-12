@@ -12,3 +12,4 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 pyo3 = "0.23.3"
 rand = "0.9.0"
+thiserror = "2.0.11"
