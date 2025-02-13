@@ -1,9 +1,9 @@
-use crate::{Storage, Tensor};
+use crate::{Dtype, DtypeVal, Storage, Tensor, TensorError};
 use std::{
     cell::RefCell,
     collections::HashSet,
     hash,
-    ops::{Add, Div, Mul, Neg},
+    ops::{Add, Div, Mul, Neg, Sub},
     rc::Rc,
 };
 use thiserror::Error;
@@ -57,14 +57,74 @@ impl hash::Hash for Op {
     }
 }
 
+impl Add for DtypeVal {
+    type Output = DtypeVal;
+
+    fn add(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x + y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x + y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Sub for DtypeVal {
+    type Output = DtypeVal;
+
+    fn sub(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x - y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x - y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Mul for DtypeVal {
+    type Output = DtypeVal;
+
+    fn mul(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x * y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x * y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Div for DtypeVal {
+    type Output = DtypeVal;
+
+    fn div(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x / y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x / y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Neg for DtypeVal {
+    type Output = DtypeVal;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            DtypeVal::Float32(x) => DtypeVal::Float32(-x),
+            DtypeVal::Int32(x) => DtypeVal::Int32(-x),
+            _ => todo!(),
+        }
+    }
+}
+
 // *****************************************************************************************************************
 // ******************************************** .forward() *********************************************
 // *****************************************************************************************************************
 
 #[derive(Error, Debug)]
 pub enum OpForwardError {
-    #[error("shape mismatch in operation: expected {expected:?}, found {found:?}")]
-    ShapeMismatch { expected: String, found: String },
+    #[error(transparent)]
+    TensorError(#[from] TensorError),
     #[error("unknown operation error")]
     Unknown,
 }
@@ -81,11 +141,11 @@ impl Op {
             // let y = op.forward();
             // y
             Op::Neg(x) => self.map(|xi| -xi, x),
-            Op::Exp(x) => self.map(|xi| xi.exp(), x),
-            Op::Log(x) => self.map(|xi| xi.ln(), x),
-            Op::Sinh(x) => self.map(|xi| xi.sinh(), x),
-            Op::Cosh(x) => self.map(|xi| xi.cosh(), x),
-            Op::Tanh(x) => self.map(|xi| xi.tanh(), x),
+            Op::Exp(x) => self.map(|xi| DtypeVal::Float32(f32::from(xi).exp()), x),
+            Op::Log(x) => self.map(|xi| DtypeVal::Float32(f32::from(xi).ln()), x),
+            Op::Sinh(x) => self.map(|xi| DtypeVal::Float32(f32::from(xi).sinh()), x),
+            Op::Cosh(x) => self.map(|xi| DtypeVal::Float32(f32::from(xi).cosh()), x),
+            Op::Tanh(x) => self.map(|xi| DtypeVal::Float32(f32::from(xi).tanh()), x),
             // sigmoid
             // relu
             Op::Sum(x, dim, keepdim) => self.reduce(x, *dim, *keepdim),
@@ -133,7 +193,7 @@ impl Op {
 
     fn map<F>(&self, f: F, x: &Tensor) -> Result<Tensor, OpForwardError>
     where
-        F: Fn(f32) -> f32,
+        F: Fn(DtypeVal) -> DtypeVal,
     {
         Ok(Tensor {
             ndim: x.ndim,
@@ -153,46 +213,42 @@ impl Op {
 
     fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Result<Tensor, OpForwardError>
     where
-        F: Fn(f32, f32) -> f32,
+        F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
     {
-        if x.shape != y.shape {
-            return Err(OpForwardError::ShapeMismatch {
-                expected: x
-                    .shape
-                    .iter()
-                    .map(|&s| s.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                found: y
-                    .shape
-                    .iter()
-                    .map(|&s| s.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            });
+        let z_shape = if x.shape != y.shape {
+            Tensor::broadcast_shape(&x.shape, &y.shape)?
+        } else {
+            x.shape.clone()
+        };
+
+        let mut z = Tensor::zeros(&z_shape, Dtype::Float32);
+
+        {
+            let (x_storage, y_storage, mut z_storage) = (
+                x.storage.borrow(),
+                y.storage.borrow(),
+                z.storage.borrow_mut(),
+            );
+
+            let (logx, logy) = (
+                Tensor::zeros(&x.shape, Dtype::Usize),
+                Tensor::zeros(&y.shape, Dtype::Usize),
+            ); // dtype int
+            for phy in 0..z.numel() {
+                let (logx, logy) = (
+                    Tensor::broadcast_logicali(
+                        logx.storage.borrow().data,
+                        logy.storage.borrow().data,
+                    )?,
+                    Tensor::broadcast_logicali(&y, &z)?,
+                );
+                let (physx, physy) = (Tensor::decode(&logx), Tensor::decode(&logy));
+
+                z_storage.data[physz] = f(x_storage.data[physx], y_storage.data[physy]);
+            }
         }
 
-        Ok(Tensor {
-            ndim: x.ndim,
-            shape: x.shape.clone(),
-            stride: x.stride.clone(),
-            input_op: Some(Box::new(self.clone())), // Box since Op owns Tensors
-            // alloc new storage
-            storage: Rc::new(RefCell::new(Storage {
-                data: x
-                    .storage
-                    .borrow()
-                    .data
-                    .iter()
-                    .zip(y.storage.borrow().data.iter())
-                    .map(|(&xi, &yi)| f(xi, yi))
-                    .collect(),
-                grad: None,
-            })),
-            device: x.device.clone(),
-            layout: x.layout.clone(),
-            dtype: x.dtype.clone(),
-        })
+        Ok(z)
     }
 
     fn reduce(&self, x: &Tensor, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
@@ -251,6 +307,7 @@ impl Div for &Tensor {
     }
 }
 
+// note: picograd operations do not support `out` arg for "return oriented programming"
 impl Tensor {
     // ***transcendental***
     pub fn exp(&self) -> Result<Tensor, OpForwardError> {
@@ -394,7 +451,7 @@ impl Op {
                 // d/dx(x - y) = 1, d/dy(x - y) = -1
                 let (dx, dy) = (
                     Tensor::ones(&grad.shape),
-                    Tensor::new(vec![-1.0; grad.numel()]),
+                    Tensor::new(vec![DtypeVal::Float32(-1.0); grad.numel()]),
                 );
                 vec![
                     (&dx * &grad.clone()).unwrap(),
@@ -420,21 +477,3 @@ impl Op {
         }
     }
 }
-
-// impl Index<(usize, usize)> for Tensor {
-//     type Output = f32; // fixed to fp32 for now
-
-//     fn index(&self, index: (usize, usize)) -> &Self::Output {
-//         let (i, j) = index;
-//         let idx = i * self.shape[1] + j; // Row-major ordering
-//         &self.data[idx]
-//     }
-// }
-
-// impl IndexMut<(usize, usize)> for Tensor {
-//     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-//         let (i, j) = index;
-//         let idx = i * self.shape[1] + j; // Row-major ordering
-//         &mut self.data[idx]
-//     }
-// }
