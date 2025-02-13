@@ -78,11 +78,24 @@ pub enum Layout { Strided  } // Sparse, // MklDnn
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
-pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64, Usize }
+pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
 
 #[rustfmt::skip]
-#[derive(Clone, Debug)]
-pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64), Usize(usize) } // f16 is unstable
+#[derive(Clone, Copy, Debug)]
+pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
+
+// TODO: remove usize for pythonic bindings?
+
+impl From<DtypeVal> for f32 {
+    fn from(value: DtypeVal) -> Self {
+        match value {
+            DtypeVal::Float32(x) => x,
+            DtypeVal::Int32(x) => x as f32,
+            DtypeVal::Int64(x) => x as f32,
+            _ => todo!(),
+        }
+    }
+}
 
 impl Tensor {
     // *****************************************************************************************************************
@@ -194,7 +207,7 @@ impl Tensor {
     ) -> fmt::Result {
         match (shape, stride) {
             ([], []) => {
-                write!(fmt, "{:.4}", self.storage.borrow().data[offset])?;
+                write!(fmt, "{:?}", self.storage.borrow().data[offset])?;
                 Ok(())
             }
             // basecase: indexed ndarray all the way through
@@ -241,7 +254,8 @@ impl Tensor {
         stride
     }
 
-    // START HERE
+    // note: Vec<usize> is used for internal indexing
+    // Vec<DtypeVal=Int32> is used by library crate users
 
     // encode: physical : usize -> logical &[usize; ndim]
     fn encode(phys: usize) -> Vec<usize> {
@@ -257,7 +271,7 @@ impl Tensor {
         todo!()
     }
 
-    fn broadcast_logicali(log_x: &[usize], log_y: &[usize]) -> Result<Vec<usize>, TensorError> {
+    fn broadcast_logidx(log_x: &[usize], log_y: &[usize]) -> Result<Vec<usize>, TensorError> {
         todo!()
     }
 

@@ -211,6 +211,12 @@ impl Op {
         })
     }
 
+    // 1. z_shape <- broadcast_shape(x.shape, y.shape)
+    // 2. for i in z.numel():
+    //      3. logz <- encode(i)
+    //      4. (logx, logy) <- broadcast_logidx(logx, logz), broadcast_logidx(logy, logz)
+    //      5. physx, physy, physz <- decode(logx), decode(logy), decode(logz)
+    //      6. z[physz] <- f(x[physx], y[physy])
     fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Result<Tensor, OpForwardError>
     where
         F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
@@ -220,8 +226,7 @@ impl Op {
         } else {
             x.shape.clone()
         };
-
-        let mut z = Tensor::zeros(&z_shape, Dtype::Float32);
+        let z = Tensor::zeros(&z_shape, Dtype::Float32);
 
         {
             let (x_storage, y_storage, mut z_storage) = (
@@ -230,19 +235,20 @@ impl Op {
                 z.storage.borrow_mut(),
             );
 
-            let (logx, logy) = (
-                Tensor::zeros(&x.shape, Dtype::Usize),
-                Tensor::zeros(&y.shape, Dtype::Usize),
-            ); // dtype int
+            let (logx, logy) = (vec![0 as usize; x.numel()], vec![0 as usize; y.numel()]);
             for phy in 0..z.numel() {
+                // map logz -> (logx, logy)
+                let logz = Tensor::encode(phy);
                 let (logx, logy) = (
-                    Tensor::broadcast_logicali(
-                        logx.storage.borrow().data,
-                        logy.storage.borrow().data,
-                    )?,
-                    Tensor::broadcast_logicali(&y, &z)?,
+                    Tensor::broadcast_logidx(&logx, &logz)?,
+                    Tensor::broadcast_logidx(&logy, &logz)?,
                 );
-                let (physx, physy) = (Tensor::decode(&logx), Tensor::decode(&logy));
+
+                let (physx, physy, physz) = (
+                    Tensor::decode(&logx, &x.stride),
+                    Tensor::decode(&logy, &y.stride),
+                    Tensor::decode(&logz, &z.stride),
+                );
 
                 z_storage.data[physz] = f(x_storage.data[physx], y_storage.data[physy]);
             }
