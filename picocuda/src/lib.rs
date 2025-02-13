@@ -9,9 +9,11 @@ use std::{
     io,
     rc::Rc,
 };
+use thiserror::Error;
 
 pub mod functional;
 // pub mod nn;
+// pub mod optim;
 
 // - lifetime: deallocation semantics
 //   - Box<_>: N/A (exclusive ownership)
@@ -30,10 +32,10 @@ pub struct Tensor {
     pub input_op: Option<Box<Op>>, // need indirection since Op owns a Tensor
 
     // physical
-    pub storage: Rc<RefCell<Storage>>,
+    pub storage: Rc<RefCell<Storage<DtypeVal>>>,
     pub device: Device,
     pub layout: Layout,
-    pub dtype: Dtype,
+    pub dtype: Dtype, // TODO? not typed with storage
 }
 
 impl Clone for Tensor {
@@ -52,8 +54,8 @@ impl Clone for Tensor {
 }
 
 #[derive(Clone, Debug)]
-pub struct Storage {
-    pub data: Vec<f32>, // picograd fixed on fp32 to bootstrap
+pub struct Storage<DtypeVal> {
+    pub data: Vec<DtypeVal>, // picograd fixed on fp32 to bootstrap
     pub grad: Option<Tensor>,
 }
 
@@ -76,14 +78,18 @@ pub enum Layout { Strided  } // Sparse, // MklDnn
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
-pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64 }
+pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64, Usize }
+
+#[rustfmt::skip]
+#[derive(Clone, Debug)]
+pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64), Usize(usize) } // f16 is unstable
 
 impl Tensor {
     // *****************************************************************************************************************
     // ********************************************* CONSTRUCTORS (alloc) **********************************************
     // *****************************************************************************************************************
 
-    fn alloc(shape: &[usize], data: Vec<f32>) -> Self {
+    fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Self {
         Self {
             ndim: shape.len(),
             shape: shape.to_owned(),
@@ -97,27 +103,30 @@ impl Tensor {
     }
 
     // todo: requires_grad: bool
-    pub fn new(data: Vec<f32>) -> Self {
+    pub fn new(data: Vec<DtypeVal>) -> Self {
         Self::alloc(&vec![data.len()], data)
     }
 
-    pub fn zeros(shape: &[usize]) -> Self {
+    pub fn zeros(shape: &[usize], dtype: Dtype) -> Self {
         let n = shape.iter().product();
-        let data = vec![0.0; n];
-        Self::alloc(shape, data)
+        match dtype {
+            Dtype::Float32 => Self::alloc(shape, vec![DtypeVal::Float32(0.0); n]),
+            Dtype::Usize => Self::alloc(shape, vec![DtypeVal::Usize(0); n]),
+            _ => todo!(),
+        }
     }
 
     pub fn ones(shape: &[usize]) -> Self {
         let n = shape.iter().product();
-        let data = vec![1.0; n];
+        let data = vec![DtypeVal::Float32(1.0); n];
         Self::alloc(shape, data)
     }
 
     pub fn randn(shape: &[usize]) -> Self {
         let n: usize = shape.iter().product::<usize>();
         let data = (0..n)
-            .map(|_| rand::rng().sample(StandardUniform))
-            .collect::<Vec<f32>>();
+            .map(|_| DtypeVal::Float32(rand::rng().sample(StandardUniform)))
+            .collect::<Vec<_>>();
 
         Self::alloc(shape, data)
     }
@@ -127,7 +136,7 @@ impl Tensor {
     }
 
     // *****************************************************************************************************************
-    // ************************************************** VIEWS ***************************************************
+    // *********************************************** VIEWS (no alloc) ************************************************
     // *****************************************************************************************************************
 
     // TODO: permute, reshape, should be Op??
@@ -208,12 +217,10 @@ impl Tensor {
             _ => panic!(),
         }
     }
-}
 
-// *****************************************************************************************************************
-// ************************************************ LOGICAL HELPERS ************************************************
-// *****************************************************************************************************************
-impl Tensor {
+    // *****************************************************************************************************************
+    // ********************************************* INDEXING/BROADCASTING *********************************************
+    // *****************************************************************************************************************
     fn numel(&self) -> usize {
         self.shape.iter().product::<usize>()
     }
@@ -233,7 +240,55 @@ impl Tensor {
 
         stride
     }
+
+    // START HERE
+
+    // encode: physical : usize -> logical &[usize; ndim]
+    fn encode(phys: usize) -> Vec<usize> {
+        todo!()
+    }
+
+    // decode: logical &[usize; ndim]-> physical : usize
+    fn decode(log: &[usize]) -> usize {
+        todo!()
+    }
+
+    fn broadcast_shape(shape_x: &[usize], shape_y: &[usize]) -> Result<Vec<usize>, TensorError> {
+        todo!()
+    }
+
+    fn broadcast_logicali(log_x: &[usize], log_y: &[usize]) -> Result<Vec<usize>, TensorError> {
+        todo!()
+    }
+
+    // THEN GO to map/zip/reduce!
 }
+
+#[derive(Error, Debug)]
+pub enum TensorError {
+    #[error("broadcast mismatch")]
+    BroadcastMismatch,
+    #[error("unknown tensor error")]
+    Unknown,
+}
+
+// impl Index<(usize, usize)> for Tensor {
+//     type Output = f32; // fixed to fp32 for now
+
+//     fn index(&self, index: (usize, usize)) -> &Self::Output {
+//         let (i, j) = index;
+//         let idx = i * self.shape[1] + j; // Row-major ordering
+//         &self.data[idx]
+//     }
+// }
+
+// impl IndexMut<(usize, usize)> for Tensor {
+//     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+//         let (i, j) = index;
+//         let idx = i * self.shape[1] + j; // Row-major ordering
+//         &mut self.data[idx]
+//     }
+// }
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
