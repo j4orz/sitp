@@ -1,4 +1,8 @@
 pub mod differentiator;
+pub mod functional;
+// pub mod nn;
+// pub mod optim;
+
 use differentiator::Op;
 use pyo3::prelude::*;
 use rand::distr::StandardUniform;
@@ -10,10 +14,6 @@ use std::{
     rc::Rc,
 };
 use thiserror::Error;
-
-pub mod functional;
-// pub mod nn;
-// pub mod optim;
 
 // - lifetime: deallocation semantics
 //   - Box<_>: N/A (exclusive ownership)
@@ -124,7 +124,6 @@ impl Tensor {
         let n = shape.iter().product();
         match dtype {
             Dtype::Float32 => Self::alloc(shape, vec![DtypeVal::Float32(0.0); n]),
-            Dtype::Usize => Self::alloc(shape, vec![DtypeVal::Usize(0); n]),
             _ => todo!(),
         }
     }
@@ -238,13 +237,19 @@ impl Tensor {
         self.shape.iter().product::<usize>()
     }
 
+    // note: best way to think about strides
+    // is to imagine the indices of the nested for loop when unrolling
+    // e.g: shape: [3, 4, 6] ==> stride: [24, 6, 1]
+    //      - one step for outer is 24 physical indices
+    //      - one step for middle is 6 physical indices
+    //      - one step for inner is 1 physical index (always)
     fn stride(shape: &[usize]) -> Vec<usize> {
         let stride = shape
             .iter()
             .rev()
             .fold((vec![], 1), |(mut strides, acc), &dim| {
                 strides.push(acc);
-                (strides, acc * dim)
+                (strides, acc * dim) // last acc does not push
             })
             .0
             .into_iter()
@@ -257,14 +262,25 @@ impl Tensor {
     // note: Vec<usize> is used for internal indexing
     // Vec<DtypeVal=Int32> is used by library crate users
 
-    // encode: physical : usize -> logical &[usize; ndim]
-    fn encode(phys: usize) -> Vec<usize> {
-        todo!()
+    // encode: phys(usize) -> log(Vec<usize>)
+    fn encode(phys: usize, shape: &[usize]) -> Vec<usize> {
+        let mut log = vec![0; shape.len()];
+        let (stride, mut phys) = (Self::stride(shape), phys);
+
+        // unroll (factorize) the quotient from largest to smallest
+        for i in 0..stride.len() {
+            log[i] = phys / stride[i]; // how many stride[i] fit into phys
+            phys %= stride[i]; // remainder
+        }
+
+        log
     }
 
-    // decode: logical &[usize; ndim]-> physical : usize
-    fn decode(log: &[usize]) -> usize {
-        todo!()
+    // decode: log(Vec<usize>) -> phys(usize)
+    fn decode(log: &[usize], stride: &[usize]) -> usize {
+        log.iter()
+            .zip(stride.iter())
+            .fold(0, |acc, (i, s)| acc + i * s)
     }
 
     fn broadcast_shape(shape_x: &[usize], shape_y: &[usize]) -> Result<Vec<usize>, TensorError> {
@@ -274,8 +290,6 @@ impl Tensor {
     fn broadcast_logidx(log_x: &[usize], log_y: &[usize]) -> Result<Vec<usize>, TensorError> {
         todo!()
     }
-
-    // THEN GO to map/zip/reduce!
 }
 
 #[derive(Error, Debug)]
