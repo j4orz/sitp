@@ -148,7 +148,7 @@ impl Op {
             Op::Tanh(x) => self.map(|xi| DtypeVal::Float32(f32::from(xi).tanh()), x),
             // sigmoid
             // relu
-            Op::Sum(x, dim, keepdim) => self.reduce(x, *dim, *keepdim),
+            Op::Sum(x, dim, keepdim) => self.reduce(|xi, yi| xi + yi, x, *dim, *keepdim),
             // max
             // min
             // mean
@@ -161,36 +161,38 @@ impl Op {
                 assert_eq!(X.ndim, 2, "X must be a 2D tensor");
                 assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
 
-                let Z = Tensor::zeros(&[n, p]);
+                // let Z = Tensor::zeros(&[n, p]);
 
-                {
-                    let (X_storage, Y_storage, mut Z_storage) = (
-                        X.storage.borrow(),
-                        Y.storage.borrow(),
-                        Z.storage.borrow_mut(),
-                    );
+                // {
+                //     let (X_storage, Y_storage, mut Z_storage) = (
+                //         X.storage.borrow(),
+                //         Y.storage.borrow(),
+                //         Z.storage.borrow_mut(),
+                //     );
 
-                    for i in 0..n {
-                        for j in 0..p {
-                            // linear combination of p basis vectors in R^m mapped to
-                            // X[n][m] * Y[m][p]
+                //     for i in 0..n {
+                //         for j in 0..p {
+                //             // linear combination of p basis vectors in R^m mapped to
+                //             // X[n][m] * Y[m][p]
 
-                            // [n][m]: m basis vectors in R^n
-                            // [m][p]: p basis vectors in R^m
-                            for k in 0..m1 {
-                                let x = X_storage.data[i * X.stride[0] + k * X.stride[1]];
-                                let y = Y_storage.data[k * Y.stride[0] + j * Y.stride[1]];
-                                Z_storage.data[i * Z.stride[0] + j * Z.stride[1]] += x * y;
-                            }
-                        }
-                    }
-                }
+                //             // [n][m]: m basis vectors in R^n
+                //             // [m][p]: p basis vectors in R^m
+                //             for k in 0..m1 {
+                //                 let x = X_storage.data[i * X.stride[0] + k * X.stride[1]];
+                //                 let y = Y_storage.data[k * Y.stride[0] + j * Y.stride[1]];
+                //                 Z_storage.data[i * Z.stride[0] + j * Z.stride[1]] += x * y;
+                //             }
+                //         }
+                //     }
+                // }
 
-                Ok(Z)
+                // Ok(Z)
+                todo!()
             }
         }
     }
 
+    // picograd does not support broadcastable map implementation with return-oriented "out" arg
     fn map<F>(&self, f: F, x: &Tensor) -> Result<Tensor, OpForwardError>
     where
         F: Fn(DtypeVal) -> DtypeVal,
@@ -213,8 +215,12 @@ impl Op {
 
     // 1. z_shape <- broadcast_shape(x.shape, y.shape)
     // 2. for i in z.numel():
+
+    //      **A: find the logical nd index of x and y**
     //      3. logz <- encode(i)
     //      4. (logx, logy) <- broadcast_logidx(logx, logz), broadcast_logidx(logy, logz)
+
+    //      **B: perform update**
     //      5. physx, physy, physz <- decode(logx), decode(logy), decode(logz)
     //      6. z[physz] <- f(x[physx], y[physy])
     fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Result<Tensor, OpForwardError>
@@ -238,7 +244,7 @@ impl Op {
             let (logx, logy) = (vec![0 as usize; x.numel()], vec![0 as usize; y.numel()]);
             for phy in 0..z.numel() {
                 // map logz -> (logx, logy)
-                let logz = Tensor::encode(phy);
+                let logz = Tensor::encode(phy, &z.shape);
                 let (logx, logy) = (
                     Tensor::broadcast_logidx(&logx, &logz)?,
                     Tensor::broadcast_logidx(&logy, &logz)?,
@@ -257,7 +263,16 @@ impl Op {
         Ok(z)
     }
 
-    fn reduce(&self, x: &Tensor, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
+    fn reduce<F>(
+        &self,
+        f: F,
+        x: &Tensor,
+        dim: usize,
+        keepdim: bool,
+    ) -> Result<Tensor, OpForwardError>
+    where
+        F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
+    {
         todo!()
     }
 }

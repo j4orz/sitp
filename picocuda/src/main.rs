@@ -1,4 +1,4 @@
-use picograd::Tensor;
+use picograd::{DtypeVal, Tensor};
 
 // GLUE
 // - use detach view op in autograd
@@ -27,35 +27,16 @@ fn main() {
     "
     );
 
-    let x = Tensor::new(vec![9.0]);
-    let y = Tensor::new(vec![10.0]);
-    let mut z = (&x + &y).unwrap();
-    z.backward();
-
-    println!("z: {}", z);
-    println!("z.grad: {}", z.storage.borrow().grad.as_ref().unwrap());
-    println!("x.grad: {}", x.storage.borrow().grad.as_ref().unwrap());
-    println!("y.grad: {}", y.storage.borrow().grad.as_ref().unwrap());
-
-    let x = Tensor::new(vec![9.0]);
-    let y = Tensor::new(vec![10.0]);
-    let mut z = (&x * &y).unwrap();
-    z.backward();
-
-    println!("z: {}", z);
-    println!("z.grad: {}", z.storage.borrow().grad.as_ref().unwrap());
-    println!("x.grad: {}", x.storage.borrow().grad.as_ref().unwrap());
-    println!("y.grad: {}", y.storage.borrow().grad.as_ref().unwrap());
-
     let X = Tensor::randn(&[2, 3]);
     let Y = Tensor::randn(&[3, 4]);
-    let Z = X.matmul(&Y).unwrap();
-    // z.backward();
+    let mut Z = (&X + &Y).unwrap();
+    Z.backward();
 
-    println!("z: {}", X);
-    println!("z: {}", Y);
-    println!("z: {}", Z);
-    // println!("z.grad: {}", z.storage.borrow().grad.as_ref().unwrap());
-    // println!("x.grad: {}", x.storage.borrow().grad.as_ref().unwrap());
-    // println!("y.grad: {}", y.storage.borrow().grad.as_ref().unwrap());
+    println!("X: {}", X);
+    println!("Y: {}", Y);
+    println!("Z: {}", Z);
+
+    println!("Z.grad: {}", Z.storage.borrow().grad.as_ref().unwrap());
+    println!("X.grad: {}", X.storage.borrow().grad.as_ref().unwrap());
+    println!("Y.grad: {}", Y.storage.borrow().grad.as_ref().unwrap());
 }
