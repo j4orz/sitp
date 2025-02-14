@@ -1,7 +1,7 @@
 pub mod differentiator;
 pub mod functional;
 // pub mod nn;
-// pub mod optim;
+// pub mod optimzer;
 
 use differentiator::Op;
 use pyo3::prelude::*;
@@ -9,8 +9,9 @@ use rand::distr::StandardUniform;
 use rand::Rng;
 use std::{
     cell::RefCell,
+    cmp::max,
     fmt::{self, Display},
-    io,
+    io, iter,
     rc::Rc,
 };
 use thiserror::Error;
@@ -98,6 +99,10 @@ impl From<DtypeVal> for f32 {
 }
 
 impl Tensor {
+    fn numel(&self) -> usize {
+        self.shape.iter().product::<usize>()
+    }
+
     // *****************************************************************************************************************
     // ********************************************* CONSTRUCTORS (alloc) **********************************************
     // *****************************************************************************************************************
@@ -148,8 +153,11 @@ impl Tensor {
     }
 
     // *****************************************************************************************************************
-    // *********************************************** VIEWS (no alloc) ************************************************
+    // ***************************************** VIEWS (no alloc/datamovement) *****************************************
     // *****************************************************************************************************************
+    // see:
+    // - https://numpy.org/doc/stable/user/basics.copies.html
+    // - https://pytorch.org/docs/stable/tensor_view.html
 
     // TODO: permute, reshape, should be Op??
 
@@ -166,6 +174,7 @@ impl Tensor {
         }
     }
 
+    // TODO: transpose could produce non-contiguous?
     pub fn permute(&self, shape: &[usize]) -> Self {
         let new_shape = shape
             .iter()
@@ -173,6 +182,11 @@ impl Tensor {
             .collect::<Vec<_>>();
 
         self.no_alloc(&new_shape)
+    }
+
+    // TODO: ??
+    pub fn contiguous(&self) -> Self {
+        todo!()
     }
 
     pub fn view(&self, shape: &[i32]) -> Self {
@@ -231,18 +245,19 @@ impl Tensor {
     }
 
     // *****************************************************************************************************************
-    // ********************************************* INDEXING/BROADCASTING *********************************************
+    // ********************************************* INDEXING *********************************************
     // *****************************************************************************************************************
-    fn numel(&self) -> usize {
-        self.shape.iter().product::<usize>()
-    }
 
+    // note: best way to think about strides
+    // is to imagine the indices of the nested for loop when unrolling
     // note: best way to think about strides
     // is to imagine the indices of the nested for loop when unrolling
     // e.g: shape: [3, 4, 6] ==> stride: [24, 6, 1]
     //      - one step for outer is 24 physical indices
     //      - one step for middle is 6 physical indices
     //      - one step for inner is 1 physical index (always)
+
+    // 1 is last because of C/C++/Rust row-major ordering over Fortran/IDL column-major ordering
     fn stride(shape: &[usize]) -> Vec<usize> {
         let stride = shape
             .iter()
@@ -267,7 +282,8 @@ impl Tensor {
         let mut log = vec![0; shape.len()];
         let (stride, mut phys) = (Self::stride(shape), phys);
 
-        // unroll (factorize) the quotient from largest to smallest
+        // expand the product into factorization
+        // traversing from largest step to smallest step
         for i in 0..stride.len() {
             log[i] = phys / stride[i]; // how many stride[i] fit into phys
             phys %= stride[i]; // remainder
@@ -278,17 +294,60 @@ impl Tensor {
 
     // decode: log(Vec<usize>) -> phys(usize)
     fn decode(log: &[usize], stride: &[usize]) -> usize {
+        // compress the factorization into a product
         log.iter()
             .zip(stride.iter())
             .fold(0, |acc, (i, s)| acc + i * s)
     }
 
+    // *****************************************************************************************************************
+    // ********************************************* BROADCASTING *********************************************
+    // *****************************************************************************************************************
     fn broadcast_shape(shape_x: &[usize], shape_y: &[usize]) -> Result<Vec<usize>, TensorError> {
-        todo!()
+        let max_len = max(shape_x.len(), shape_y.len());
+        let shape_x = iter::repeat(1)
+            .take(max_len - shape_x.len())
+            .chain(shape_x.iter().copied())
+            .collect::<Vec<_>>();
+        let shape_y = std::iter::repeat(1)
+            .take(max_len - shape_y.len())
+            .chain(shape_y.iter().copied())
+            .collect::<Vec<_>>();
+
+        let output = shape_x
+            .iter()
+            .zip(shape_y.iter())
+            .map(|(&x, &y)| match (x, y) {
+                (x, y) if x == y => Ok(x),
+                (1, y) => Ok(y),
+                (x, 1) => Ok(x),
+                _ => Err(TensorError::BroadcastMismatch),
+            })
+            .collect::<Result<Vec<usize>, TensorError>>();
+
+        output
     }
 
     fn broadcast_logidx(log_x: &[usize], log_y: &[usize]) -> Result<Vec<usize>, TensorError> {
-        todo!()
+        let max_len = max(log_x.len(), log_y.len());
+        let padded_x = iter::repeat(0)
+            .take(max_len - log_x.len())
+            .chain(log_x.iter().copied());
+        let padded_y = iter::repeat(0)
+            .take(max_len - log_y.len())
+            .chain(log_y.iter().copied());
+
+        let output = padded_x
+            .zip(padded_y)
+            .map(|(x, y)| match (x, y) {
+                (x, y) if x == y => Ok(x),
+                (0, y) => Ok(y),
+                (x, 0) => Ok(x),
+                _ => Err(TensorError::BroadcastMismatch),
+            })
+            .collect::<Result<Vec<usize>, TensorError>>();
+
+        output
     }
 }
 
