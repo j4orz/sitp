@@ -1,5 +1,6 @@
 pub mod differentiator;
 pub mod functional;
+pub mod libpy;
 // pub mod nn;
 // pub mod optimzer;
 
@@ -24,6 +25,9 @@ use thiserror::Error;
 //   - RefCell<_>: safe
 //   - UnsafeCell<_>: efficient
 
+// - pyo3 bindings for e2e *model* tests and integr8 *op* tests
+
+#[pyclass(unsendable)] // for now. does pytorch user code multithread tensors?
 #[derive(Debug)]
 pub struct Tensor {
     // logical
@@ -34,6 +38,7 @@ pub struct Tensor {
 
     // physical
     pub storage: Rc<RefCell<Storage<DtypeVal>>>,
+    // pub storage: Arc<RwLock<Storage<DtypeVal>>>,
     pub device: Device,
     pub layout: Layout,
     pub dtype: Dtype, // TODO? not typed with storage
@@ -69,24 +74,27 @@ impl Display for Tensor {
 
 // ********************************************* physical types **********************************************
 
+#[pyclass(eq)]
 #[rustfmt::skip]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Device { Cpu, Cuda, Mps }
 
+#[pyclass(eq)]
 #[rustfmt::skip]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Layout { Strided  } // Sparse, // MklDnn
 
+#[pyclass(eq)]
 #[rustfmt::skip]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
 
+#[pyclass(eq)]
 #[rustfmt::skip]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
 
 // TODO: remove usize for pythonic bindings?
-
 impl From<DtypeVal> for f32 {
     fn from(value: DtypeVal) -> Self {
         match value {
@@ -98,60 +106,64 @@ impl From<DtypeVal> for f32 {
     }
 }
 
+// *****************************************************************************************************************
+// ********************************************* CONSTRUCTORS (alloc) **********************************************
+// *****************************************************************************************************************
+
+fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
+    Tensor {
+        ndim: shape.len(),
+        shape: shape.to_owned(),
+        stride: Tensor::shape_to_stride(shape),
+        input_op: None,
+        storage: Rc::new(RefCell::new(Storage { data, grad: None })),
+        device: Device::Cpu,
+        layout: Layout::Strided,
+        dtype: Dtype::Float32,
+    }
+}
+
+// todo: requires_grad: bool
+#[pyfunction]
+pub fn new(data: Vec<DtypeVal>) -> Tensor {
+    alloc(&vec![data.len()], data)
+}
+
+#[pyfunction]
+pub fn zeros(shape: Vec<usize>, dtype: Dtype) -> Tensor {
+    let n = shape.iter().product();
+    match dtype {
+        Dtype::Float32 => alloc(&shape, vec![DtypeVal::Float32(0.0); n]),
+        _ => todo!(),
+    }
+}
+
+#[pyfunction]
+pub fn ones(shape: Vec<usize>) -> Tensor {
+    let n = shape.iter().product();
+    let data = vec![DtypeVal::Float32(1.0); n];
+    alloc(&shape, data)
+}
+
+#[pyfunction]
+pub fn randn(shape: Vec<usize>) -> Tensor {
+    let n: usize = shape.iter().product::<usize>();
+    let data = (0..n)
+        .map(|_| DtypeVal::Float32(rand::rng().sample(StandardUniform)))
+        .collect::<Vec<_>>();
+
+    alloc(&shape, data)
+}
+
+#[pyfunction]
+pub fn arange(start: f32, end: f32, step: f32) -> Tensor {
+    todo!()
+}
+
 impl Tensor {
     fn numel(&self) -> usize {
         self.shape.iter().product::<usize>()
     }
-
-    // *****************************************************************************************************************
-    // ********************************************* CONSTRUCTORS (alloc) **********************************************
-    // *****************************************************************************************************************
-
-    fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Self {
-        Self {
-            ndim: shape.len(),
-            shape: shape.to_owned(),
-            stride: Self::stride(shape),
-            input_op: None,
-            storage: Rc::new(RefCell::new(Storage { data, grad: None })),
-            device: Device::Cpu,
-            layout: Layout::Strided,
-            dtype: Dtype::Float32,
-        }
-    }
-
-    // todo: requires_grad: bool
-    pub fn new(data: Vec<DtypeVal>) -> Self {
-        Self::alloc(&vec![data.len()], data)
-    }
-
-    pub fn zeros(shape: &[usize], dtype: Dtype) -> Self {
-        let n = shape.iter().product();
-        match dtype {
-            Dtype::Float32 => Self::alloc(shape, vec![DtypeVal::Float32(0.0); n]),
-            _ => todo!(),
-        }
-    }
-
-    pub fn ones(shape: &[usize]) -> Self {
-        let n = shape.iter().product();
-        let data = vec![DtypeVal::Float32(1.0); n];
-        Self::alloc(shape, data)
-    }
-
-    pub fn randn(shape: &[usize]) -> Self {
-        let n: usize = shape.iter().product::<usize>();
-        let data = (0..n)
-            .map(|_| DtypeVal::Float32(rand::rng().sample(StandardUniform)))
-            .collect::<Vec<_>>();
-
-        Self::alloc(shape, data)
-    }
-
-    pub fn arange(start: f32, end: f32, step: f32) -> Self {
-        todo!()
-    }
-
     // *****************************************************************************************************************
     // ***************************************** VIEWS (no alloc/datamovement) *****************************************
     // *****************************************************************************************************************
@@ -165,7 +177,7 @@ impl Tensor {
         Self {
             ndim: shape.len(),
             shape: shape.to_vec(),
-            stride: Self::stride(shape),
+            stride: Self::shape_to_stride(shape),
             input_op: self.input_op.clone(), // Box<_>.clone()?
             storage: self.storage.clone(),
             device: self.device.clone(),
@@ -258,7 +270,7 @@ impl Tensor {
     //      - one step for inner is 1 physical index (always)
 
     // 1 is last because of C/C++/Rust row-major ordering over Fortran/IDL column-major ordering
-    fn stride(shape: &[usize]) -> Vec<usize> {
+    fn shape_to_stride(shape: &[usize]) -> Vec<usize> {
         let stride = shape
             .iter()
             .rev()
@@ -280,7 +292,7 @@ impl Tensor {
     // encode: phys(usize) -> log(Vec<usize>)
     fn encode(phys: usize, shape: &[usize]) -> Vec<usize> {
         let mut log = vec![0; shape.len()];
-        let (stride, mut phys) = (Self::stride(shape), phys);
+        let (stride, mut phys) = (Self::shape_to_stride(shape), phys);
 
         // expand the product into factorization
         // traversing from largest step to smallest step
@@ -376,16 +388,3 @@ pub enum TensorError {
 //         &mut self.data[idx]
 //     }
 // }
-
-/// Formats the sum of two numbers as string.
-#[pyfunction]
-fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-    Ok((a + b).to_string())
-}
-
-/// A Python module implemented in Rust.
-#[pymodule]
-fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
-    Ok(())
-}

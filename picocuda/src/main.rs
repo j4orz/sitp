@@ -6,7 +6,6 @@ use picograd::{DtypeVal, Tensor};
 // - fuzzer
 //      - https://pytorch.org/docs/stable/notes/numerical_accuracy.html
 // static? jax : https://docs.jax.dev/en/latest/autodidax.html
-// - pyo3 bindings
 
 // inference (rng)
 // - picograd.randint()
@@ -27,8 +26,8 @@ fn main() {
     "
     );
 
-    let X = Tensor::randn(&[2, 3]);
-    let Y = Tensor::randn(&[3, 4]);
+    let X = picograd::randn(vec![2, 3]);
+    let Y = picograd::randn(vec![3, 4]);
     let mut Z = (&X + &Y).unwrap();
     Z.backward();
 

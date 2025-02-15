@@ -232,7 +232,7 @@ impl Op {
         } else {
             x.shape.clone()
         };
-        let z = Tensor::zeros(&z_shape, Dtype::Float32);
+        let z = crate::zeros(z_shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
 
         {
             let (x_storage, y_storage, mut z_storage) = (
@@ -263,6 +263,8 @@ impl Op {
         Ok(z)
     }
 
+    // from dlsys:
+    // Because summing over individual axes can be a bit tricky, even for compact arrays, these functions (in Python) in Python simplify things by permuting the last axis to the be the one reduced over (this is what the reduce_view_out() function in NDArray does), then compacting the array. So for your ReduceMax() and ReduceSum() functions you implement in C++, you can assume that both the input and output arrays are contiguous in memory, and you want to just reduce over contiguous elements of size reduce_size as passed to the C++ functions.
     fn reduce<F>(
         &self,
         f: F,
@@ -413,7 +415,7 @@ impl Tensor {
     // reversemode/forwardmode is same for \mathbb{R} because of associativity
     // but with \mahtbb{R^{nxm}} you have to make sure matrices are associative
     pub fn backward(&mut self) -> () {
-        self.storage.borrow_mut().grad = Some(Tensor::ones(&self.shape)); // base case dfdx
+        self.storage.borrow_mut().grad = Some(crate::ones(self.shape.clone())); // base case dfdx. // clone because of python/rust memory mismatch
         let (mut topo, mut visited) = (Vec::new(), HashSet::new());
         self.topo(&mut topo, &mut visited);
 
@@ -462,7 +464,10 @@ impl Op {
         match self {
             Op::Add(_x, _y) => {
                 // d/dx(x + y) = 1, d/dy(x + y) = 1
-                let (dx, dy) = (Tensor::ones(&grad.shape), Tensor::ones(&grad.shape));
+                let (dx, dy) = (
+                    crate::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    crate::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                );
                 vec![
                     (&dx * &grad.clone()).unwrap(),
                     (&dy * &grad.clone()).unwrap(),
@@ -471,8 +476,8 @@ impl Op {
             Op::Sub(_x, _y) => {
                 // d/dx(x - y) = 1, d/dy(x - y) = -1
                 let (dx, dy) = (
-                    Tensor::ones(&grad.shape),
-                    Tensor::new(vec![DtypeVal::Float32(-1.0); grad.numel()]),
+                    crate::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    crate::new(vec![DtypeVal::Float32(-1.0); grad.numel()]),
                 );
                 vec![
                     (&dx * &grad.clone()).unwrap(),
