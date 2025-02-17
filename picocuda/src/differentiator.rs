@@ -3,7 +3,7 @@ use std::{
     cell::RefCell,
     collections::HashSet,
     hash,
-    ops::{Add, Div, Mul, Neg, Sub},
+    ops::{Add, AddAssign, Div, Mul, Neg, Sub},
     rc::Rc,
 };
 use thiserror::Error;
@@ -66,6 +66,12 @@ impl Add for DtypeVal {
             (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x + y),
             _ => todo!(),
         }
+    }
+}
+
+impl AddAssign for DtypeVal {
+    fn add_assign(&mut self, other: Self) {
+        *self = self.add(other);
     }
 }
 
@@ -161,33 +167,32 @@ impl Op {
                 assert_eq!(X.ndim, 2, "X must be a 2D tensor");
                 assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
 
-                // let Z = Tensor::zeros(&[n, p]);
+                let Z = crate::zeros(vec![n, p], Dtype::Float32);
 
-                // {
-                //     let (X_storage, Y_storage, mut Z_storage) = (
-                //         X.storage.borrow(),
-                //         Y.storage.borrow(),
-                //         Z.storage.borrow_mut(),
-                //     );
+                {
+                    let (X_storage, Y_storage, mut Z_storage) = (
+                        X.storage.borrow(),
+                        Y.storage.borrow(),
+                        Z.storage.borrow_mut(),
+                    );
 
-                //     for i in 0..n {
-                //         for j in 0..p {
-                //             // linear combination of p basis vectors in R^m mapped to
-                //             // X[n][m] * Y[m][p]
+                    for i in 0..n {
+                        for j in 0..p {
+                            // linear combination of p basis vectors in R^m mapped to
+                            // X[n][m] * Y[m][p]
 
-                //             // [n][m]: m basis vectors in R^n
-                //             // [m][p]: p basis vectors in R^m
-                //             for k in 0..m1 {
-                //                 let x = X_storage.data[i * X.stride[0] + k * X.stride[1]];
-                //                 let y = Y_storage.data[k * Y.stride[0] + j * Y.stride[1]];
-                //                 Z_storage.data[i * Z.stride[0] + j * Z.stride[1]] += x * y;
-                //             }
-                //         }
-                //     }
-                // }
+                            // [n][m]: m basis vectors in R^n
+                            // [m][p]: p basis vectors in R^m
+                            for k in 0..m1 {
+                                let x = X_storage.data[i * X.stride[0] + k * X.stride[1]];
+                                let y = Y_storage.data[k * Y.stride[0] + j * Y.stride[1]];
+                                Z_storage.data[i * Z.stride[0] + j * Z.stride[1]] += x * y;
+                            }
+                        }
+                    }
+                }
 
-                // Ok(Z)
-                todo!()
+                Ok(Z)
             }
         }
     }
@@ -294,6 +299,16 @@ impl Add for &Tensor {
 
     fn add(self, input_other: &Tensor) -> Self::Output {
         let op = Op::Add(self.clone(), input_other.clone());
+        let output = op.forward();
+        output
+    }
+}
+
+impl Sub for &Tensor {
+    type Output = Result<Tensor, OpForwardError>;
+
+    fn sub(self, input_other: &Tensor) -> Self::Output {
+        let op = Op::Sub(self.clone(), input_other.clone());
         let output = op.forward();
         output
     }

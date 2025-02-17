@@ -1,6 +1,6 @@
-use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList};
-
 use crate::{nn, Device, Dtype, DtypeVal, Layout, Tensor};
+use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList};
+use std::ops::{Add, Div, Mul, Sub};
 
 #[pymethods]
 impl Tensor {
@@ -36,6 +36,31 @@ impl Tensor {
     #[getter]
     fn dtype(&self) -> Dtype {
         self.dtype.clone()
+    }
+
+    fn __add__(&self, other: &Tensor) -> PyResult<Tensor> {
+        self.add(other)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> {
+        self.sub(other)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> {
+        self.mul(other)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    fn __div__(&self, other: &Tensor) -> PyResult<Tensor> {
+        self.div(other)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> {
+        self.matmul(other)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 }
 

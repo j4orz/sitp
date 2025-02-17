@@ -21,16 +21,16 @@ fn main() {
     "
     );
 
-    let X = picograd::randn(vec![2, 3]);
-    let Y = picograd::randn(vec![3, 4]);
-    let mut Z = (&X + &Y).unwrap();
-    Z.backward();
+    let X = picograd::ones(vec![3, 3]);
+    let Y = picograd::ones(vec![3, 3]);
+    let Z = (&X + &Y).unwrap();
+    // Z.backward();
 
     println!("X: {}", X);
     println!("Y: {}", Y);
     println!("Z: {}", Z);
 
-    println!("Z.grad: {}", Z.storage.borrow().grad.as_ref().unwrap());
-    println!("X.grad: {}", X.storage.borrow().grad.as_ref().unwrap());
-    println!("Y.grad: {}", Y.storage.borrow().grad.as_ref().unwrap());
+    // println!("Z.grad: {}", Z.storage.borrow().grad.as_ref().unwrap());
+    // println!("X.grad: {}", X.storage.borrow().grad.as_ref().unwrap());
+    // println!("Y.grad: {}", Y.storage.borrow().grad.as_ref().unwrap());
 }
