@@ -1,7 +1,6 @@
 pub mod differentiator;
-pub mod functional;
 pub mod libpy;
-// pub mod nn;
+pub mod nn;
 // pub mod optimzer;
 
 use differentiator::Op;

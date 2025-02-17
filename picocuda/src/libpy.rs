@@ -1,6 +1,6 @@
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList};
 
-use crate::{Device, Dtype, DtypeVal, Layout, Tensor};
+use crate::{nn, Device, Dtype, DtypeVal, Layout, Tensor};
 
 #[pymethods]
 impl Tensor {
@@ -62,6 +62,8 @@ fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // ops
     m.add_function(wrap_pyfunction!(tanh, m)?)?;
+    nn_module(m)?;
+
     // F.cross_entropy()
     // F.softmax()
 
@@ -71,4 +73,17 @@ fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // - picograd.Generator().manual_seed()
     // - https://pytorch.org/docs/stable/notes/randomness.html
     Ok(())
+}
+
+fn nn_module(pg_module: &Bound<'_, PyModule>) -> PyResult<()> {
+    let nn_module = PyModule::new(pg_module.py(), "nn")?;
+    functional_module(&nn_module)?;
+    pg_module.add_submodule(&nn_module)
+}
+
+fn functional_module(nn_module: &Bound<'_, PyModule>) -> PyResult<()> {
+    let functional_module = PyModule::new(nn_module.py(), "functional")?;
+    functional_module.add_function(wrap_pyfunction!(nn::cross_entropy, &functional_module)?)?;
+    functional_module.add_function(wrap_pyfunction!(nn::softmax, &functional_module)?)?;
+    nn_module.add_submodule(&functional_module)
 }
