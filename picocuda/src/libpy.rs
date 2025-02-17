@@ -1,4 +1,4 @@
-use pyo3::{prelude::*, types::PyList};
+use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList};
 
 use crate::{Device, Dtype, DtypeVal, Layout, Tensor};
 
@@ -45,6 +45,11 @@ fn tensor<'py>(data: Bound<'py, PyList>) -> PyResult<Tensor> {
     Ok(crate::new(data))
 }
 
+#[pyfunction]
+fn tanh(x: Tensor) -> PyResult<Tensor> {
+    x.tanh().map_err(|e| PyRuntimeError::new_err(e.to_string()))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -55,7 +60,8 @@ fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(crate::randn, m)?)?;
     m.add_function(wrap_pyfunction!(crate::arange, m)?)?;
 
-    // tanh
+    // ops
+    m.add_function(wrap_pyfunction!(tanh, m)?)?;
     // F.cross_entropy()
     // F.softmax()
 
