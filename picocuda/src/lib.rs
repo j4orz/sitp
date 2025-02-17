@@ -25,7 +25,9 @@ use thiserror::Error;
 //   - RefCell<_>: safe
 //   - UnsafeCell<_>: efficient
 
-// - pyo3 bindings for e2e *model* tests and integr8 *op* tests
+// TODO (vertical drilling)
+// - e2e/smoke model test: (ffn)
+// - integr8 op tests
 
 #[pyclass(unsendable)] // for now. does pytorch user code multithread tensors?
 #[derive(Debug)]
@@ -74,23 +76,23 @@ impl Display for Tensor {
 
 // ********************************************* physical types **********************************************
 
-#[pyclass(eq)]
 #[rustfmt::skip]
+#[pyclass(eq)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Device { Cpu, Cuda, Mps }
 
-#[pyclass(eq)]
 #[rustfmt::skip]
+#[pyclass(eq)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Layout { Strided  } // Sparse, // MklDnn
 
-#[pyclass(eq)]
 #[rustfmt::skip]
+#[pyclass(eq)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
 
-#[pyclass(eq)]
 #[rustfmt::skip]
+#[derive(FromPyObject)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
 

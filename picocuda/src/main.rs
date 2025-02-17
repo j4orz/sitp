@@ -7,11 +7,6 @@ use picograd::{DtypeVal, Tensor};
 //      - https://pytorch.org/docs/stable/notes/numerical_accuracy.html
 // static? jax : https://docs.jax.dev/en/latest/autodidax.html
 
-// inference (rng)
-// - picograd.randint()
-// - picograd.multinomial()
-// - picograd.Generator().manual_seed()
-// - https://pytorch.org/docs/stable/notes/randomness.html
 fn main() {
     println!(
         "
