@@ -111,7 +111,7 @@ impl From<DtypeVal> for f32 {
 // ********************************************* CONSTRUCTORS (alloc) **********************************************
 // *****************************************************************************************************************
 
-fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
+pub fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
     Tensor {
         ndim: shape.len(),
         shape: shape.to_owned(),
@@ -172,7 +172,8 @@ impl Tensor {
     // - https://numpy.org/doc/stable/user/basics.copies.html
     // - https://pytorch.org/docs/stable/tensor_view.html
 
-    // TODO: permute, reshape, should be Op??
+    // TODO: permute, reshape, should be "HLOp".??
+    // only operate on the tensor shape. not data.
 
     fn no_alloc(&self, shape: &[usize]) -> Self {
         Self {

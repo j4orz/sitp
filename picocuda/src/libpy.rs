@@ -1,4 +1,5 @@
 use crate::{nn, Device, Dtype, DtypeVal, Layout, Tensor};
+use numpy::{PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList};
 use std::ops::{Add, Div, Mul, Sub};
 
@@ -65,9 +66,27 @@ impl Tensor {
 }
 
 #[pyfunction]
-fn tensor<'py>(data: Bound<'py, PyList>) -> PyResult<Tensor> {
-    let data = data.extract::<Vec<DtypeVal>>()?;
-    Ok(crate::new(data))
+fn tensor<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
+    if let Ok(np) = data.downcast::<numpy::PyArrayDyn<f32>>() {
+        // cast once to PyArrayDyn<f32>
+        let np = np.try_readonly()?;
+        let (data, shape) = (
+            np.as_slice()?
+                .to_vec()
+                .into_iter()
+                .map(DtypeVal::Float32) // cast twice to picograd::DtypeVal
+                .collect(),
+            np.shape().to_vec(),
+        );
+        Ok(crate::alloc(&shape, data))
+    } else if let Ok(pylist) = data.downcast::<PyList>() {
+        let data_vec = pylist.extract::<Vec<DtypeVal>>()?;
+        Ok(crate::new(data_vec))
+    } else {
+        Err(PyRuntimeError::new_err(
+            "Unsupported type: Expected NumPy ndarray or list",
+        ))
+    }
 }
 
 #[pyfunction]
@@ -78,6 +97,8 @@ fn tanh(x: Tensor) -> PyResult<Tensor> {
 /// A Python module implemented in Rust.
 #[pymodule]
 fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // m.add_class::<Tensor>()?;
+
     // constructors
     m.add_function(wrap_pyfunction!(tensor, m)?)?;
     m.add_function(wrap_pyfunction!(crate::zeros, m)?)?;
@@ -88,7 +109,6 @@ fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // ops
     m.add_function(wrap_pyfunction!(tanh, m)?)?;
     nn_module(m)?;
-
     // F.cross_entropy()
     // F.softmax()
 
