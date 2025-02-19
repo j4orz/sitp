@@ -245,7 +245,6 @@ impl Op {
                 y.storage.borrow(),
                 z.storage.borrow_mut(),
             );
-
             let (logx, logy) = (vec![0; x.ndim], vec![0; y.ndim]);
             for phy in 0..z.numel() {
                 // map logz -> (logx, logy)
@@ -268,19 +267,41 @@ impl Op {
         Ok(z)
     }
 
-    // from dlsys:
-    // Because summing over individual axes can be a bit tricky, even for compact arrays, these functions (in Python) in Python simplify things by permuting the last axis to the be the one reduced over (this is what the reduce_view_out() function in NDArray does), then compacting the array. So for your ReduceMax() and ReduceSum() functions you implement in C++, you can assume that both the input and output arrays are contiguous in memory, and you want to just reduce over contiguous elements of size reduce_size as passed to the C++ functions.
     fn reduce<F>(
         &self,
         f: F,
         x: &Tensor,
-        dim: usize,
-        keepdim: bool,
+        dim_reduce: usize,
+        _keepdim: bool,
     ) -> Result<Tensor, OpForwardError>
     where
         F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
     {
-        todo!()
+        let y_shape = x
+            .shape
+            .iter()
+            .enumerate()
+            .map(|(i, &dim_size)| if i == dim_reduce { 1 } else { dim_size })
+            .collect();
+        let y = crate::zeros(y_shape, Dtype::Float32); // clone because of python/rust memory mismatch
+
+        {
+            let (x_storage, mut y_storage) = (x.storage.borrow(), y.storage.borrow_mut());
+            for physy in 0..y.numel() {
+                let mut logy = Tensor::encode(physy, &y.shape);
+
+                for d in 0..x.shape[dim_reduce] {
+                    logy[dim_reduce] = d;
+                    let physx = Tensor::decode(&logy, &x.stride);
+
+                    // accumulate/reduce
+                    y_storage.data[physy] = f(y_storage.data[physy], x_storage.data[physx]);
+                    // acc/reduce
+                }
+            }
+        }
+
+        Ok(y)
     }
 }
 

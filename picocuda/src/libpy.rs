@@ -108,6 +108,12 @@ fn log(x: Tensor) -> PyResult<Tensor> {
     x.log().map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
+#[pyfunction]
+fn sum(x: Tensor, dim: usize, keepdim: bool) -> PyResult<Tensor> {
+    x.sum(dim, keepdim)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -124,6 +130,7 @@ fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(tanh, m)?)?;
     m.add_function(wrap_pyfunction!(exp, m)?)?;
     m.add_function(wrap_pyfunction!(log, m)?)?;
+    m.add_function(wrap_pyfunction!(sum, m)?)?;
     nn_module(m)?;
     // F.cross_entropy()
     // F.softmax()

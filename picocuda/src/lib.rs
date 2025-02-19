@@ -25,10 +25,6 @@ use thiserror::Error;
 //   - RefCell<_>: safe
 //   - UnsafeCell<_>: efficient
 
-// TODO (vertical drilling)
-// - e2e/smoke model test: (ffn)
-// - integr8 op tests
-
 #[pyclass(unsendable)] // for now. does pytorch user code multithread tensors?
 #[derive(Debug)]
 pub struct Tensor {

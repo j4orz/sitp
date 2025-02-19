@@ -63,6 +63,9 @@ class TestOps(unittest.TestCase):
     def test_log(self):
         assrt([(3,3)], lambda x: torch.log(x), lambda x: picograd.log(x))
 
+    def test_sum(self):
+        assrt([(3,3)], lambda x: x.sum(dim=1, keepdim=True), lambda x: picograd.sum(x, 1, True))
+
 if __name__ == '__main__':
     np.random.seed(1337)
     unittest.main(verbosity=2)
