@@ -58,7 +58,7 @@ impl Tensor {
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
-    fn __div__(&self, other: &Tensor) -> PyResult<Tensor> {
+    fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> {
         self.div(other)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }

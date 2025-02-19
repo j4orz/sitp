@@ -39,20 +39,20 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
 # ********************************************* TESTS **********************************************
 class TestOps(unittest.TestCase):
     def test_add(self):
-        assrt([(3, 3), (3, 3)], lambda x,y: x+y)
+        assrt([(3,3), (3,3)], lambda x,y: x+y)
 
-    # def test_sub(self):
-    #     helper_test_op([3, 3], lambda x,y: x-y)
+    def test_sub(self):
+        assrt([(3,3), (3,3)], lambda x,y: x-y)
 
-    # def test_mul(self):
-    #     helper_test_op([3, 3], lambda x,y: x*y)
+    def test_mul(self):
+        assrt([(3,3), (3,3)], lambda x,y: x*y)
 
+    def test_div(self):
+        assrt([(3,3), (3,3)], lambda x,y: x/y)
 
-    # def test_div(self):
-    #     helper_test_op([3, 3], lambda x,y: x/y)
-
-    # def test_matmul(self):
-    #     helper_test_op([(64), (64,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
+    def test_matmul(self):
+        # assrt([(64), (64,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
+        assrt([(3,3), (3,3)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
 
 if __name__ == '__main__':
     np.random.seed(1337)
