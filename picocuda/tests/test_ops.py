@@ -8,7 +8,7 @@ def assrt(input_shapes, f_tch, f_pg=None, l=-2, h=2, atol=1e-6, rtol=1e-3, grad_
     if f_pg is None: f_pg = f_tch
     xtch, xpg = gen_inputs(input_shapes, l, h, rg)
     ytch, ypg = f_tch(*xtch), f_pg(*xpg)
-    verify_outputs("forward pass", ytch.detach().numpy(), ypg.numpy(), atol=atol, rtol=rtol)
+    verify_outputs("forward pass", ytch.detach().numpy(), ypg.detach().numpy(), atol=atol, rtol=rtol)
     # compare(f"backward pass tensor {i}", tt_grad.numpy(), t.grad.detach().numpy(), atol=grad_atol, rtol=grad_rtol)
 
 def gen_inputs(input_shapes, l, h, rg=False):

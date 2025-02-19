@@ -174,6 +174,19 @@ impl Tensor {
         let np_shaped = np_flat.reshape(self.shape.clone())?;
         Ok(np_shaped)
     }
+
+    pub fn detach(&self) -> Self {
+        Self {
+            ndim: self.ndim,
+            shape: self.shape.clone(),
+            stride: self.stride.clone(),
+            input_op: None, // detach
+            storage: self.storage.clone(),
+            device: self.device.clone(),
+            layout: self.layout.clone(),
+            dtype: self.dtype.clone(),
+        }
+    }
 }
 
 impl Tensor {
@@ -203,20 +216,6 @@ impl Tensor {
             dtype: self.dtype.clone(),
         }
     }
-
-    pub fn detach(&self) -> Self {
-        Self {
-            ndim: self.ndim,
-            shape: self.shape.clone(),
-            stride: self.stride.clone(),
-            input_op: None, // detach
-            storage: self.storage.clone(),
-            device: self.device.clone(),
-            layout: self.layout.clone(),
-            dtype: self.dtype.clone(),
-        }
-    }
-
     // TODO: transpose could produce non-contiguous?
     pub fn permute(&self, shape: &[usize]) -> Self {
         let new_shape = shape
