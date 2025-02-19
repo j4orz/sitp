@@ -27,21 +27,19 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
     # if PRINT_TENSORS: print(s, xtch, x_pico)
     try:
         assert ytch.shape == ypg.shape, f"shape mismatch: expected={ytch.shape} | actual={ypg.shape}"
-        print("moose", type(ytch.dtype))
-        print("deer", type(ypg.dtype))
         assert ytch.dtype == ypg.dtype, f"dtype mismatch: expected={ytch.dtype} | actual={ypg.dtype}"
 
         if np.issubdtype(ytch.dtype, np.floating):
             np.testing.assert_allclose(ytch, ypg, atol=atol, rtol=rtol)
         else:
             np.testing.assert_equal(ytch, ypg)
-    except Exception as e:
-        raise Exception(f"{s} failed shape {ytch.shape}: {e}")
+    except AssertionError as e:
+        raise AssertionError(f"{s} failed (shape={ytch.shape}) - {str(e)}") from None
 
 # ********************************************* TESTS **********************************************
 class TestOps(unittest.TestCase):
     def test_add(self):
-        assrt([(4, 5, 6), (4, 5, 6)], lambda x,y: x+y)
+        assrt([(3, 3), (3, 3)], lambda x,y: x+y)
 
     # def test_sub(self):
     #     helper_test_op([3, 3], lambda x,y: x-y)

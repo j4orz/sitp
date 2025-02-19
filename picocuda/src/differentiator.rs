@@ -246,7 +246,7 @@ impl Op {
                 z.storage.borrow_mut(),
             );
 
-            let (logx, logy) = (vec![0 as usize; x.numel()], vec![0 as usize; y.numel()]);
+            let (logx, logy) = (vec![0; x.ndim], vec![0; y.ndim]);
             for phy in 0..z.numel() {
                 // map logz -> (logx, logy)
                 let logz = Tensor::encode(phy, &z.shape);
