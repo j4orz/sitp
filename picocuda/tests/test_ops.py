@@ -54,6 +54,15 @@ class TestOps(unittest.TestCase):
         # assrt([(64), (64,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
         assrt([(3,3), (3,3)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
 
+    def test_tanh(self):
+        assrt([(3,3)], lambda x: torch.tanh(x), lambda x: picograd.tanh(x))
+
+    def test_exp(self):
+        assrt([(3,3)], lambda x: torch.exp(x), lambda x: picograd.exp(x))
+
+    def test_log(self):
+        assrt([(3,3)], lambda x: torch.log(x), lambda x: picograd.log(x))
+
 if __name__ == '__main__':
     np.random.seed(1337)
     unittest.main(verbosity=2)

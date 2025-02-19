@@ -98,6 +98,16 @@ fn tanh(x: Tensor) -> PyResult<Tensor> {
     x.tanh().map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
+#[pyfunction]
+fn exp(x: Tensor) -> PyResult<Tensor> {
+    x.exp().map_err(|e| PyRuntimeError::new_err(e.to_string()))
+}
+
+#[pyfunction]
+fn log(x: Tensor) -> PyResult<Tensor> {
+    x.log().map_err(|e| PyRuntimeError::new_err(e.to_string()))
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -112,6 +122,8 @@ fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // ops
     m.add_function(wrap_pyfunction!(tanh, m)?)?;
+    m.add_function(wrap_pyfunction!(exp, m)?)?;
+    m.add_function(wrap_pyfunction!(log, m)?)?;
     nn_module(m)?;
     // F.cross_entropy()
     // F.softmax()
