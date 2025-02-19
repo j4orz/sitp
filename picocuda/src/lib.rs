@@ -4,6 +4,7 @@ pub mod nn;
 // pub mod optimzer;
 
 use differentiator::Op;
+use numpy::{IntoPyArray, PyArrayMethods};
 use pyo3::prelude::*;
 use rand::distr::StandardUniform;
 use rand::Rng;
@@ -161,7 +162,26 @@ pub fn arange(start: f32, end: f32, step: f32) -> Tensor {
     todo!()
 }
 
+#[pymethods]
 impl Tensor {
+    fn numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, numpy::PyArrayDyn<f32>>> {
+        // todo: why does pytorch need to detatch first?
+        let data = self
+            .storage
+            .borrow()
+            .data
+            .iter()
+            .map(|&x| x.into())
+            .collect::<Vec<f32>>();
+
+        let np_flat = data.into_pyarray(py).to_dyn().to_owned();
+        let np_shaped = np_flat.reshape(self.shape.clone())?;
+        Ok(np_shaped)
+    }
+}
+
+impl Tensor {
+    // alloc
     fn numel(&self) -> usize {
         self.shape.iter().product::<usize>()
     }
@@ -181,6 +201,19 @@ impl Tensor {
             shape: shape.to_vec(),
             stride: Self::shape_to_stride(shape),
             input_op: self.input_op.clone(), // Box<_>.clone()?
+            storage: self.storage.clone(),
+            device: self.device.clone(),
+            layout: self.layout.clone(),
+            dtype: self.dtype.clone(),
+        }
+    }
+
+    pub fn detach(&self) -> Self {
+        Self {
+            ndim: self.ndim,
+            shape: self.shape.clone(),
+            stride: self.stride.clone(),
+            input_op: None, // detach
             storage: self.storage.clone(),
             device: self.device.clone(),
             layout: self.layout.clone(),
@@ -218,11 +251,6 @@ impl Tensor {
         }
 
         Ok(self.no_alloc(shape))
-    }
-
-    pub fn detach(&self) -> Self {
-        // self.no_alloc(&self.shape)
-        todo!()
     }
 
     fn format(

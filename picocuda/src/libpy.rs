@@ -1,6 +1,10 @@
 use crate::{nn, Device, Dtype, DtypeVal, Layout, Tensor};
 use numpy::{PyArrayMethods, PyUntypedArrayMethods};
-use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList};
+use pyo3::{
+    exceptions::PyRuntimeError,
+    prelude::*,
+    types::{PyList, PyTuple},
+};
 use std::ops::{Add, Div, Mul, Sub};
 
 #[pymethods]
@@ -15,8 +19,8 @@ impl Tensor {
     }
 
     #[getter]
-    fn shape(&self) -> Vec<usize> {
-        self.shape.clone()
+    fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(py, &self.shape)
     }
 
     #[getter]
