@@ -287,8 +287,6 @@ impl Tensor {
 
     // note: best way to think about strides
     // is to imagine the indices of the nested for loop when unrolling
-    // note: best way to think about strides
-    // is to imagine the indices of the nested for loop when unrolling
     // e.g: shape: [3, 4, 6] ==> stride: [24, 6, 1]
     //      - one step for outer is 24 physical indices
     //      - one step for middle is 6 physical indices
@@ -314,7 +312,7 @@ impl Tensor {
     // note: Vec<usize> is used for internal indexing
     // Vec<DtypeVal=Int32> is used by library crate users
 
-    // encode: phys(usize) -> log(Vec<usize>)
+    // encode (lifting): phys(usize) -> log(Vec<usize>)
     fn encode(phys: usize, shape: &[usize]) -> Vec<usize> {
         let mut log = vec![0; shape.len()];
         let (stride, mut phys) = (Self::shape_to_stride(shape), phys);
@@ -329,11 +327,13 @@ impl Tensor {
         log
     }
 
-    // decode: log(Vec<usize>) -> phys(usize)
+    // decode (lowering): log(Vec<usize>) -> phys(usize)
     fn decode(log: &[usize], stride: &[usize]) -> usize {
-        // compress the factorization into a product
+        // collapse the factorization into a product
+        println!("===");
         log.iter()
             .zip(stride.iter())
+            .inspect(|(i, s)| println!("i: {:?}, s: {:?}", i, s))
             .fold(0, |acc, (i, s)| acc + i * s)
     }
 

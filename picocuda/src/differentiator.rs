@@ -221,11 +221,11 @@ impl Op {
     // 1. z_shape <- broadcast_shape(x.shape, y.shape)
     // 2. for i in z.numel():
 
-    //      **A: find the logical nd index of x and y**
+    //      **a. find the logical nd index of x and y**
     //      3. logz <- encode(i)
     //      4. (logx, logy) <- broadcast_logidx(logx, logz), broadcast_logidx(logy, logz)
 
-    //      **B: perform update**
+    //      **b. perform update**
     //      5. physx, physy, physz <- decode(logx), decode(logy), decode(logz)
     //      6. z[physz] <- f(x[physx], y[physy])
     fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Result<Tensor, OpForwardError>
@@ -239,6 +239,10 @@ impl Op {
         };
         let z = crate::zeros(z_shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
 
+        println!("x.shape: {:?}", x.shape);
+        println!("y.shape: {:?}", y.shape);
+        println!("z.shape: {:?}", z.shape);
+
         {
             let (x_storage, y_storage, mut z_storage) = (
                 x.storage.borrow(),
@@ -246,21 +250,25 @@ impl Op {
                 z.storage.borrow_mut(),
             );
             let (logx, logy) = (vec![0; x.ndim], vec![0; y.ndim]);
-            for phy in 0..z.numel() {
+            for phyz in 0..z.numel() {
                 // map logz -> (logx, logy)
-                let logz = Tensor::encode(phy, &z.shape);
+                let logz = Tensor::encode(phyz, &z.shape);
                 let (logx, logy) = (
                     Tensor::broadcast_logidx(&logx, &logz)?,
                     Tensor::broadcast_logidx(&logy, &logz)?,
                 );
 
-                let (physx, physy, physz) = (
+                let (phyx, phyy) = (
                     Tensor::decode(&logx, &x.stride),
                     Tensor::decode(&logy, &y.stride),
-                    Tensor::decode(&logz, &z.stride),
                 );
 
-                z_storage.data[physz] = f(x_storage.data[physx], y_storage.data[physy]);
+                println!("phy: {:?}", phyz);
+                println!("logx {:?} -> physx: {:?}", logx, phyx);
+                println!("logy {:?} -> physy: {:?}", logy, phyy);
+                println!("logz {:?} -> physz: {:?}", logz, phyz);
+
+                z_storage.data[phyz] = f(x_storage.data[phyx], y_storage.data[phyy]);
             }
         }
 
@@ -272,7 +280,7 @@ impl Op {
         f: F,
         x: &Tensor,
         dim_reduce: usize,
-        _keepdim: bool,
+        keepdim: bool,
     ) -> Result<Tensor, OpForwardError>
     where
         F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
@@ -283,7 +291,7 @@ impl Op {
             .enumerate()
             .map(|(i, &dim_size)| if i == dim_reduce { 1 } else { dim_size })
             .collect();
-        let y = crate::zeros(y_shape, Dtype::Float32); // clone because of python/rust memory mismatch
+        let mut y = crate::zeros(y_shape, Dtype::Float32); // clone because of python/rust memory mismatch
 
         {
             let (x_storage, mut y_storage) = (x.storage.borrow(), y.storage.borrow_mut());
@@ -299,6 +307,11 @@ impl Op {
                     // acc/reduce
                 }
             }
+        }
+
+        if !keepdim {
+            y.shape.remove(dim_reduce);
+            y.ndim -= 1;
         }
 
         Ok(y)
@@ -345,16 +358,15 @@ impl Mul for &Tensor {
     }
 }
 
-// #[derive(Clone, Copy, Debug)]
-// pub struct Scalar(pub f32); // how does wrapper type interop with pyo3 bindings?
+impl Mul<f32> for &Tensor {
+    type Output = Result<Tensor, OpForwardError>;
 
-// impl Mul<&Tensor> for Scalar {
-//     type Output = Tensor;
-
-//     fn mul(self, rhs: Self) -> Self::Output {
-//         todo!()
-//     }
-// }
+    fn mul(self, other: f32) -> Self::Output {
+        let op = Op::Mul(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let output = op.forward();
+        output
+    }
+}
 
 impl Div for &Tensor {
     type Output = Result<Tensor, OpForwardError>;

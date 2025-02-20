@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import picograd
 
+# see: https://pytorch.org/docs/stable/notes/numerical_accuracy.html
+
 # ********************************************* HELPERS **********************************************
 def assrt(input_shapes, f_tch, f_pg=None, l=-2, h=2, atol=1e-6, rtol=1e-3, grad_atol=1e-4, grad_rtol=1e-3, rg=False):
     if f_pg is None: f_pg = f_tch
@@ -47,6 +49,11 @@ class TestOps(unittest.TestCase):
     def test_mul(self):
         assrt([(3,3), (3,3)], lambda x,y: x*y)
 
+    # def test_mul_scalar(self):
+        # assrt([(3,3)], lambda x: x*8)
+        # assrt([(3,3)], lambda x: 8*x)
+        # assrt([(3,3)], lambda x: x*-1)
+
     def test_div(self):
         assrt([(3,3), (3,3)], lambda x,y: x/y)
 
@@ -65,6 +72,9 @@ class TestOps(unittest.TestCase):
 
     def test_sum(self):
         assrt([(3,3)], lambda x: x.sum(dim=1, keepdim=True), lambda x: picograd.sum(x, 1, True))
+
+    # def test_cross_entropy(self):
+    #     assrt([(3,3), (3,3)], lambda p,q: torch.nn.functional.cross_entropy(p, q), lambda p,q: picograd.nn.functional.cross_entropy(p, q))
 
 if __name__ == '__main__':
     np.random.seed(1337)
