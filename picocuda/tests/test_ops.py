@@ -48,11 +48,12 @@ class TestOps(unittest.TestCase):
 
     def test_mul(self):
         assrt([(3,3), (3,3)], lambda x,y: x*y)
+        assrt([(3,1), (1,3)], lambda x,y: x*y)
 
-    # def test_mul_scalar(self):
-        # assrt([(3,3)], lambda x: x*8)
+    def test_mul_scalar(self):
+        assrt([(3,3)], lambda x: x*8)
         # assrt([(3,3)], lambda x: 8*x)
-        # assrt([(3,3)], lambda x: x*-1)
+        assrt([(3,3)], lambda x: x*-1)
 
     def test_div(self):
         assrt([(3,3), (3,3)], lambda x,y: x/y)

@@ -330,10 +330,9 @@ impl Tensor {
     // decode (lowering): log(Vec<usize>) -> phys(usize)
     fn decode(log: &[usize], stride: &[usize]) -> usize {
         // collapse the factorization into a product
-        println!("===");
         log.iter()
             .zip(stride.iter())
-            .inspect(|(i, s)| println!("i: {:?}, s: {:?}", i, s))
+            // .inspect(|(i, s)| println!("i: {:?}, s: {:?}", i, s))
             .fold(0, |acc, (i, s)| acc + i * s)
     }
 
@@ -361,6 +360,29 @@ impl Tensor {
                 _ => Err(TensorError::BroadcastMismatch),
             })
             .collect::<Result<Vec<usize>, TensorError>>();
+
+        output
+    }
+
+    fn clamp_stride(shape_x: &[usize]) -> Vec<usize> {
+        // TODO: assumes input_shape successfully broadcasted with other input
+        // TODO: ignore padded scenario when input_shape.len() < output_shape.len()
+        let output = shape_x
+            .iter()
+            .rev()
+            .fold((vec![], 1), |(mut stride, mut acc), &dim| {
+                if dim == 1 {
+                    stride.push(0);
+                } else {
+                    stride.push(acc);
+                    acc *= dim;
+                }
+                (stride, acc)
+            })
+            .0
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>();
 
         output
     }

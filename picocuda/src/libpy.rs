@@ -53,9 +53,18 @@ impl Tensor {
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
-    fn __mul__(&self, other: &Tensor) -> PyResult<Tensor> {
-        self.mul(other)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    fn __mul__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
+        if let Ok(val) = other.extract::<f32>() {
+            self.mul(val)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else if let Ok(t2) = other.extract::<Tensor>() {
+            self.mul(&t2)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else {
+            Err(PyRuntimeError::new_err(
+                "Expected a Tensor or a float32 scalar.",
+            ))
+        }
     }
 
     fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> {

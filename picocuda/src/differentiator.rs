@@ -219,29 +219,40 @@ impl Op {
     }
 
     // 1. z_shape <- broadcast_shape(x.shape, y.shape)
-    // 2. for i in z.numel():
+    // 2. for physz in z.numel():
 
     //      **a. find the logical nd index of x and y**
-    //      3. logz <- encode(i)
-    //      4. (logx, logy) <- broadcast_logidx(logx, logz), broadcast_logidx(logy, logz)
+    //      3. logz <- encode(i) # lift physical z to logical z
+    //      4. (logx, logy) <- broadcast_logidx(logx, logz), broadcast_logidx(logy, logz) # map logical z over to logical x and y
+    //      5. physx, physy <- decode(logx), decode(logy) # lower x and y to physical
 
-    //      **b. perform update**
-    //      5. physx, physy, physz <- decode(logx), decode(logy), decode(logz)
     //      6. z[physz] <- f(x[physx], y[physy])
     fn zip<F>(&self, f: F, x: &Tensor, y: &Tensor) -> Result<Tensor, OpForwardError>
     where
         F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
     {
-        let z_shape = if x.shape != y.shape {
-            Tensor::broadcast_shape(&x.shape, &y.shape)?
-        } else {
-            x.shape.clone()
-        };
-        let z = crate::zeros(z_shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
+        let (x, y, z) = if x.shape != y.shape {
+            let z_shape = Tensor::broadcast_shape(&x.shape, &y.shape)?;
+            let z = crate::zeros(z_shape, Dtype::Float32); // clone because of python/rust memory mismatch
 
-        println!("x.shape: {:?}", x.shape);
-        println!("y.shape: {:?}", y.shape);
-        println!("z.shape: {:?}", z.shape);
+            let (x_stride, y_stride) = (
+                Tensor::clamp_stride(&x.shape),
+                Tensor::clamp_stride(&y.shape),
+            );
+
+            let (mut x, mut y) = (x.clone(), y.clone());
+            x.stride = x_stride;
+            y.stride = y_stride;
+
+            (x, y, z)
+        } else {
+            let z = crate::zeros(x.shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
+            (x.clone(), y.clone(), z) // TODO: possibly remove taking view just to satisfy typechecker
+        };
+
+        println!("x.shape: {:?}, x.stride: {:?}", x.shape, x.stride);
+        println!("y.shape: {:?}, y.stride: {:?}", y.shape, y.stride);
+        println!("z.shape: {:?}, z.stride: {:?}", z.shape, z.stride);
 
         {
             let (x_storage, y_storage, mut z_storage) = (
@@ -250,14 +261,14 @@ impl Op {
                 z.storage.borrow_mut(),
             );
             let (logx, logy) = (vec![0; x.ndim], vec![0; y.ndim]);
+
             for phyz in 0..z.numel() {
-                // map logz -> (logx, logy)
                 let logz = Tensor::encode(phyz, &z.shape);
+
                 let (logx, logy) = (
                     Tensor::broadcast_logidx(&logx, &logz)?,
                     Tensor::broadcast_logidx(&logy, &logz)?,
                 );
-
                 let (phyx, phyy) = (
                     Tensor::decode(&logx, &x.stride),
                     Tensor::decode(&logy, &y.stride),
