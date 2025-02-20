@@ -207,6 +207,7 @@ impl Op {
             shape: x.shape.clone(),
             stride: x.stride.clone(),
             input_op: Some(Box::new(self.clone())), // Box since Op owns Tensors
+            requires_grad: x.requires_grad,
             // alloc new storage
             storage: Rc::new(RefCell::new(Storage {
                 data: x.storage.borrow().data.iter().map(|&xi| f(xi)).collect(),

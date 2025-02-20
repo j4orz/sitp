@@ -24,6 +24,16 @@ impl Tensor {
     }
 
     #[getter]
+    fn requires_grad(&self) -> bool {
+        self.requires_grad
+    }
+
+    #[setter]
+    fn set_requires_grad(&mut self, value: bool) {
+        self.requires_grad = value;
+    }
+
+    #[getter]
     fn stride(&self) -> Vec<usize> {
         self.stride.clone()
     }

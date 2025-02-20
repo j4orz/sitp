@@ -33,6 +33,7 @@ pub struct Tensor {
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
     pub input_op: Option<Box<Op>>, // need indirection since Op owns a Tensor
+    pub requires_grad: bool,
 
     // physical
     pub storage: Rc<RefCell<Storage<DtypeVal>>>,
@@ -49,6 +50,7 @@ impl Clone for Tensor {
             shape: self.shape.clone(),
             stride: self.stride.clone(),
             input_op: self.input_op.clone(),
+            requires_grad: self.requires_grad,
             storage: self.storage.clone(), // Rc::clone()
             device: self.device.clone(),
             layout: self.layout.clone(),
@@ -114,6 +116,7 @@ pub fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
         shape: shape.to_owned(),
         stride: Tensor::shape_to_stride(shape),
         input_op: None,
+        requires_grad: false,
         storage: Rc::new(RefCell::new(Storage { data, grad: None })),
         device: Device::Cpu,
         layout: Layout::Strided,
@@ -181,6 +184,7 @@ impl Tensor {
             shape: self.shape.clone(),
             stride: self.stride.clone(),
             input_op: None, // detach
+            requires_grad: self.requires_grad,
             storage: self.storage.clone(),
             device: self.device.clone(),
             layout: self.layout.clone(),
@@ -210,6 +214,7 @@ impl Tensor {
             shape: shape.to_vec(),
             stride: Self::shape_to_stride(shape),
             input_op: self.input_op.clone(), // Box<_>.clone()?
+            requires_grad: self.requires_grad,
             storage: self.storage.clone(),
             device: self.device.clone(),
             layout: self.layout.clone(),
