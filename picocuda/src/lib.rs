@@ -13,6 +13,7 @@ use std::{
     cmp::max,
     fmt::{self, Display},
     io, iter,
+    ops::Index,
     rc::Rc,
 };
 use thiserror::Error;
@@ -91,6 +92,7 @@ pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
 
 #[rustfmt::skip]
 #[derive(FromPyObject)]
+#[derive(IntoPyObject)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
 
@@ -423,15 +425,14 @@ pub enum TensorError {
     Unknown,
 }
 
-// impl Index<(usize, usize)> for Tensor {
-//     type Output = f32; // fixed to fp32 for now
+impl Index<Vec<usize>> for Tensor {
+    type Output = DtypeVal;
 
-//     fn index(&self, index: (usize, usize)) -> &Self::Output {
-//         let (i, j) = index;
-//         let idx = i * self.shape[1] + j; // Row-major ordering
-//         &self.data[idx]
-//     }
-// }
+    fn index(&self, index: Vec<usize>) -> &Self::Output {
+        let phy = Self::decode(&index, &self.stride);
+        unsafe { &self.storage.try_borrow_unguarded().unwrap().data[phy] }
+    }
+}
 
 // impl IndexMut<(usize, usize)> for Tensor {
 //     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {

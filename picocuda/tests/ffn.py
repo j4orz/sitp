@@ -148,16 +148,16 @@ token_terminal = 0
 for _ in range(20):
   output, context = [], [0] * T
   while True:
-      emb = C[picograd.tensor([context])] # 1. picograd.tensor with nested context
-      X_BD = emb.view(emb.shape[0], -1) # 2. .view
-      for h in model:
-        X_BD = h(X_BD)
-      logits = X_BD
-      probs = F.softmax(logits, dim=1) # 3. softmax
+        emb = C[picograd.tensor([context])]
+        X_BD = emb.view(emb.shape[0], -1) # 2. .view
+        for h in model:
+            X_BD = h(X_BD)
+            logits = X_BD
+            probs = F.softmax(logits, dim=1) # 3. softmax
 
-      token = picograd.multinomial(probs, num_samples=1, replacement=True).item()#, generator=g).item() # 4. multinomial
-      context = context[1:] + [token]
-      output.append(decode[token])
-      if token == token_terminal:
-          break
+            token = picograd.multinomial(probs, num_samples=1, replacement=True).item()#, generator=g).item() # 4. multinomial
+            context = context[1:] + [token]
+            output.append(decode[token])
+            if token == token_terminal:
+                break
   print(''.join(output))

@@ -13,6 +13,26 @@ impl Tensor {
         Ok(format!("{}", self))
     }
 
+    // TODO: partial indexing return Tensor with one less dim
+    fn __getitem__(&self, log: Tensor) -> PyResult<DtypeVal> {
+        let log = log
+            .storage
+            .borrow()
+            .data
+            .iter()
+            .map(|x| match x {
+                DtypeVal::Int16(x) => *x as usize,
+                DtypeVal::Int32(x) => *x as usize,
+                DtypeVal::Int64(x) => *x as usize,
+                DtypeVal::Bool(x) => panic!(),
+                DtypeVal::Float32(x) => *x as usize,
+                DtypeVal::Float64(x) => *x as usize,
+            })
+            .collect::<Vec<_>>();
+        let phy = Self::decode(&log, &self.stride);
+        Ok(self.storage.borrow().data[phy].clone())
+    }
+
     #[getter]
     fn ndim(&self) -> usize {
         self.ndim
@@ -131,8 +151,8 @@ fn tensor<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
     } else if let Ok(pylist) = data.downcast::<PyList>() {
         let (mut data, mut shape) = (Vec::new(), Vec::new());
         flatten_pylist(pylist.as_any(), &mut data, &mut shape, 1)?;
-        println!("moose {:?}", data);
-        println!("moose {:?}", shape);
+        // println!("moose {:?}", data);
+        // println!("moose {:?}", shape);
         Ok(crate::alloc(&shape, data))
     } else {
         Err(PyRuntimeError::new_err(
