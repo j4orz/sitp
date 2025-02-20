@@ -161,40 +161,51 @@ fn sum(x: Tensor, dim: usize, keepdim: bool) -> PyResult<Tensor> {
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn picograd(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     // m.add_class::<Tensor>()?;
 
     // constructors
-    m.add_function(wrap_pyfunction!(tensor, m)?)?;
-    m.add_function(wrap_pyfunction!(crate::zeros, m)?)?;
-    m.add_function(wrap_pyfunction!(crate::ones, m)?)?;
-    m.add_function(wrap_pyfunction!(crate::randn, m)?)?;
-    m.add_function(wrap_pyfunction!(crate::arange, m)?)?;
+    pg_m.add_function(wrap_pyfunction!(tensor, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(crate::zeros, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(crate::ones, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(crate::randn, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(crate::arange, pg_m)?)?;
 
     // ops
-    m.add_function(wrap_pyfunction!(tanh, m)?)?;
-    m.add_function(wrap_pyfunction!(exp, m)?)?;
-    m.add_function(wrap_pyfunction!(log, m)?)?;
-    m.add_function(wrap_pyfunction!(sum, m)?)?;
-    nn_module(m)?;
+    pg_m.add_function(wrap_pyfunction!(tanh, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(exp, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(log, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(sum, pg_m)?)?;
 
-    // inference (rng)
-    // - picograd.randint()
-    // - picograd.multinomial()
-    // - picograd.Generator().manual_seed()
-    // - https://pytorch.org/docs/stable/notes/randomness.html
+    // nn.functional
+    let ff_m = PyModule::new(py, "functional")?;
+    ff_m.add_function(wrap_pyfunction!(nn::cross_entropy, &ff_m)?)?;
+
+    // nn
+    let nn_m = PyModule::new(py, "nn")?;
+    nn_m.add_submodule(&ff_m)?;
+    pg_m.add_submodule(&nn_m)?;
+
+    // BUG: see pyo3/issues/759: https://github.com/PyO3/pyo3/issues/759#issuecomment-977835119
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("picograd.nn", nn_m)?;
+
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("picograd.nn.functional", ff_m)?;
+
     Ok(())
 }
 
-fn nn_module(pg_module: &Bound<'_, PyModule>) -> PyResult<()> {
-    let nn_module = PyModule::new(pg_module.py(), "nn")?;
-    functional_module(&nn_module)?;
-    pg_module.add_submodule(&nn_module)
-}
+// fn register_nn_module(parent_module: &Bound<'_, PyModule>) -> PyResult<()> {
+//     let nn_m = PyModule::new(parent_module.py(), "nn")?;
+//     register_nn_functional_module(&nn_m)?;
+//     parent_module.add_submodule(&nn_m)
+// }
 
-fn functional_module(nn_module: &Bound<'_, PyModule>) -> PyResult<()> {
-    let functional_module = PyModule::new(nn_module.py(), "functional")?;
-    functional_module.add_function(wrap_pyfunction!(nn::cross_entropy, &functional_module)?)?;
-    // functional_module.add_function(wrap_pyfunction!(nn::softmax, &functional_module)?)?;
-    nn_module.add_submodule(&functional_module)
-}
+// fn register_nn_functional_module(parent_module: &Bound<'_, PyModule>) -> PyResult<()> {
+//     let functional_m = PyModule::new(parent_module.py(), "functional")?;
+//     functional_m.add_function(wrap_pyfunction!(nn::cross_entropy, &functional_m)?)?;
+//     parent_module.add_submodule(&functional_m)
+// }
