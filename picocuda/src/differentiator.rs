@@ -316,7 +316,6 @@ impl Op {
 
                     // accumulate/reduce
                     y_storage.data[physy] = f(y_storage.data[physy], x_storage.data[physx]);
-                    // acc/reduce
                 }
             }
         }

@@ -85,8 +85,11 @@ class TestOps(unittest.TestCase):
     def test_sum(self):
         assrt([(3,3)], lambda x: x.sum(dim=1, keepdim=True), lambda x: picograd.sum(x, 1, True))
 
-    # def test_cross_entropy(self):
-    #     assrt([(3,3), (3,3)], lambda p,q: torch.nn.functional.cross_entropy(p, q), lambda p,q: picograd.nn.functional.cross_entropy(p, q))
+    def test_cross_entropy(self):
+        assrt([(3), (3)], lambda p,q: torch.nn.functional.cross_entropy(p, q), lambda p,q: picograd.nn.functional.cross_entropy(p, q))
+
+    def test_softmax(self):
+        assrt([(3), (3)], lambda x: torch.nn.functional.softmax(x, dim=1), lambda x: picograd.nn.functional.softmax(x, 1))
 
 if __name__ == '__main__':
     np.random.seed(1337)

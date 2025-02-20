@@ -129,13 +129,37 @@ fn tensor<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
         );
         Ok(crate::alloc(&shape, data))
     } else if let Ok(pylist) = data.downcast::<PyList>() {
-        let data_vec = pylist.extract::<Vec<DtypeVal>>()?;
-        Ok(crate::new(data_vec))
+        let (mut data, mut shape) = (Vec::new(), Vec::new());
+        flatten_pylist(pylist.as_any(), &mut data, &mut shape, 1)?;
+        println!("moose {:?}", data);
+        println!("moose {:?}", shape);
+        Ok(crate::alloc(&shape, data))
     } else {
         Err(PyRuntimeError::new_err(
             "Unsupported type: Expected NumPy ndarray or list",
         ))
     }
+}
+
+fn flatten_pylist<'py>(
+    pyobj: &Bound<'py, PyAny>,
+    data: &mut Vec<DtypeVal>,
+    shape: &mut Vec<usize>,
+    i: usize, // 1-based
+) -> PyResult<()> {
+    match pyobj.downcast::<PyList>() {
+        Ok(pylist) => {
+            if shape.len() < i {
+                shape.push(pylist.len());
+            }
+            for item in pylist.iter() {
+                flatten_pylist(&item, data, shape, i + 1)?;
+            }
+        }
+        Err(_) => data.push(pyobj.extract::<DtypeVal>()?),
+    };
+
+    Ok(())
 }
 
 #[pyfunction]

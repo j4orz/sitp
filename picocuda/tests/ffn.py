@@ -74,54 +74,55 @@ params = [C] + [p for l in model for p in l.parameters()]
 for p in params:
     p.requires_grad = True
 
-print("moose")
+print("model loaded to cpu")
 
 # *********************TRAINING LOOP*********************
-# # 1. dataloader
-# import picograd.nn.functional as F
-# import random
+# 1. dataloader
+import picograd.nn.functional as F
+import random
 
-# words = open('./data/names.txt', 'r').read().splitlines()
-# v = sorted(list(set(''.join(words))))
-# encode = { c:i+1 for i,c in enumerate(v) }
-# encode['.'] = 0
-# decode = { i:c for c,i in encode.items() }
+words = open('./tests/names.txt', 'r').read().splitlines()
+v = sorted(list(set(''.join(words))))
+encode = { c:i+1 for i,c in enumerate(v) }
+encode['.'] = 0
+decode = { i:c for c,i in encode.items() }
 
-# def gen_dataset(words):
-#     X, Y = [], []
-#     for w in words:
-#         context = [0] * T;
-#         for c in w + '.':
-#             X.append(context)
-#             Y.append(encode[c])
-#             # print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
-#             context = context[1:] + [encode[c]]
-#     X, Y = picograd.tensor(X), picograd.tensor(Y) # X:(N,C) Y:(N)
-#     return X, Y
+def gen_dataset(words):
+    X, Y = [], []
+    for w in words[:3]:
+        context = [0] * T;
+        for c in w + '.':
+            X.append(context)
+            Y.append(encode[c])
+            # print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
+            context = context[1:] + [encode[c]]
 
-# random.seed(42)
-# random.shuffle(words)
-# n1, n2 = int(0.8*len(words)), int(0.9*len(words))
-# Xtr, Ytr = gen_dataset(words[:n1])
-# Xdev, Ydev = gen_dataset(words[n1:n2])
-# Xte, Yte = gen_dataset(words[n2:])
+    X, Y = picograd.tensor(X), picograd.tensor(Y) # X:(N,C) Y:(N)
+    return X, X
+
+random.seed(42)
+random.shuffle(words)
+n1, n2 = int(0.8*len(words)), int(0.9*len(words))
+Xtr, Ytr = gen_dataset(words[:n1])
+Xdev, Ydev = gen_dataset(words[n1:n2])
+Xte, Yte = gen_dataset(words[n2:])
 
 # # 2. training loop
 # N = Xtr.shape[0]
 # losses, steps = [], []
 # for step in range(200000):
 #     # 1. forward
-#     indices_B = picograd.randint(0, N, (B,))
+#     indices_B = picograd.randint(0, N, (B,)) # 6. picograd.randint
 #     X_B, Y_B = Xtr[indices_B], Ytr[indices_B]
 
 #     X_BD = C[X_B].view(-1, T * E)
 #     for layer in model:
 #         X_BD = layer(X_BD)
-#     loss = F.cross_entropy(X_BD, Y_B)
+#     loss = F.cross_entropy(X_BD, Y_B) # 5. picograd.cross_entropy
 
 #     # 2. backward
 #     for layer in model:
-#         layer.out.retain_grad()
+#         layer.out.retain_grad() # 6 .retain_grad()
 #     for p in params:
 #         p.grad = None
 #     loss.backward()
@@ -143,20 +144,20 @@ print("moose")
 #   if isinstance(layer, BatchNorm1D):
 #       layer.training = False
 
-# token_terminal = 0
-# for _ in range(20):
-#   output, context = [], [0] * T
-#   while True:
-#       emb = C[picograd.tensor([context])]
-#       X_BD = emb.view(emb.shape[0], -1)
-#       for layer in model:
-#         X_BD = layer(X_BD)
-#       logits = X_BD
-#       probs = F.softmax(logits, dim=1)
+token_terminal = 0
+for _ in range(20):
+  output, context = [], [0] * T
+  while True:
+      emb = C[picograd.tensor([context])] # 1. picograd.tensor with nested context
+      X_BD = emb.view(emb.shape[0], -1) # 2. .view
+      for h in model:
+        X_BD = h(X_BD)
+      logits = X_BD
+      probs = F.softmax(logits, dim=1) # 3. softmax
 
-#       token = picograd.multinomial(probs, num_samples=1, replacement=True, generator=g).item()
-#       context = context[1:] + [token]
-#       output.append(decode[token])
-#       if token == token_terminal:
-#           break
-#   print(''.join(output))
+      token = picograd.multinomial(probs, num_samples=1, replacement=True).item()#, generator=g).item() # 4. multinomial
+      context = context[1:] + [token]
+      output.append(decode[token])
+      if token == token_terminal:
+          break
+  print(''.join(output))

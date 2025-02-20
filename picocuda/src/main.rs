@@ -12,14 +12,19 @@ fn main() {
     "
     );
 
+    // TODO:
+    // ===forward:
+    // -smell?: map_err: tensor/op error -> python error in lib_py.rs
+    // -declarative rust module in lib_py.rs
+    // -go through all comments
+
+    // ===backward:
+
+    // speed: CPU perf
+    // SSE, AVX, AVX2, AVX512, ARM
+
     let X = picograd::ones(vec![3, 1]);
     let Y = picograd::ones(vec![1, 3]);
     let Z = (&X * &Y).unwrap();
     // Z.backward();
-
-    // println!("X: {}", X);4
-    // println!("Z: {}", Z);
-    // println!("Z.grad: {}", Z.storage.borrow().grad.as_ref().unwrap());
-    // println!("X.grad: {}", X.storage.borrow().grad.as_ref().unwrap());
-    // println!("Y.grad: {}", Y.storage.borrow().grad.as_ref().unwrap());
 }
