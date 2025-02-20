@@ -43,16 +43,33 @@ impl Tensor {
         self.dtype.clone()
     }
 
-    fn __add__(&self, other: &Tensor) -> PyResult<Tensor> {
-        self.add(other)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    fn __add__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
+        if let Ok(val) = other.extract::<f32>() {
+            self.add(val)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else if let Ok(t2) = other.extract::<Tensor>() {
+            self.add(&t2)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else {
+            Err(PyRuntimeError::new_err(
+                "Expected a Tensor or a float32 scalar.",
+            ))
+        }
     }
 
-    fn __sub__(&self, other: &Tensor) -> PyResult<Tensor> {
-        self.sub(other)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    fn __sub__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
+        if let Ok(val) = other.extract::<f32>() {
+            self.sub(val)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else if let Ok(t2) = other.extract::<Tensor>() {
+            self.sub(&t2)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else {
+            Err(PyRuntimeError::new_err(
+                "Expected a Tensor or a float32 scalar.",
+            ))
+        }
     }
-
     fn __mul__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
         if let Ok(val) = other.extract::<f32>() {
             self.mul(val)
@@ -67,9 +84,18 @@ impl Tensor {
         }
     }
 
-    fn __truediv__(&self, other: &Tensor) -> PyResult<Tensor> {
-        self.div(other)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    fn __truediv__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
+        if let Ok(val) = other.extract::<f32>() {
+            self.div(val)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else if let Ok(t2) = other.extract::<Tensor>() {
+            self.div(&t2)
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        } else {
+            Err(PyRuntimeError::new_err(
+                "Expected a Tensor or a float32 scalar.",
+            ))
+        }
     }
 
     fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> {

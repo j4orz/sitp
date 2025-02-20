@@ -11,10 +11,15 @@ pub fn cross_entropy(p: Tensor, q: Tensor) -> PyResult<Tensor> {
         .log()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let plogq = (&p * &logq).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let sum = plogq
-        .sum(1, true)
+    // sum across classes:
+    let sum_class = plogq
+        .sum(1, false)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let negsum = (-&sum).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    // sum across batch (or mean, etc.) if you want a scalar:
+    let sum_all = sum_class
+        .sum(0, false)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let negsum = (-&sum_all).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     Ok(negsum)
 }
 

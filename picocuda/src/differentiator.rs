@@ -250,9 +250,9 @@ impl Op {
             (x.clone(), y.clone(), z) // TODO: possibly remove taking view just to satisfy typechecker
         };
 
-        println!("x.shape: {:?}, x.stride: {:?}", x.shape, x.stride);
-        println!("y.shape: {:?}, y.stride: {:?}", y.shape, y.stride);
-        println!("z.shape: {:?}, z.stride: {:?}", z.shape, z.stride);
+        // println!("x.shape: {:?}, x.stride: {:?}", x.shape, x.stride);
+        // println!("y.shape: {:?}, y.stride: {:?}", y.shape, y.stride);
+        // println!("z.shape: {:?}, z.stride: {:?}", z.shape, z.stride);
 
         {
             let (x_storage, y_storage, mut z_storage) = (
@@ -274,10 +274,10 @@ impl Op {
                     Tensor::decode(&logy, &y.stride),
                 );
 
-                println!("phy: {:?}", phyz);
-                println!("logx {:?} -> physx: {:?}", logx, phyx);
-                println!("logy {:?} -> physy: {:?}", logy, phyy);
-                println!("logz {:?} -> physz: {:?}", logz, phyz);
+                // println!("phy: {:?}", phyz);
+                // println!("logx {:?} -> physx: {:?}", logx, phyx);
+                // println!("logy {:?} -> physy: {:?}", logy, phyy);
+                // println!("logz {:?} -> physz: {:?}", logz, phyz);
 
                 z_storage.data[phyz] = f(x_storage.data[phyx], y_storage.data[phyy]);
             }
@@ -349,6 +349,15 @@ impl Add for &Tensor {
     }
 }
 
+impl Add<f32> for &Tensor {
+    type Output = Result<Tensor, OpForwardError>;
+
+    fn add(self, other: f32) -> Self::Output {
+        let op = Op::Add(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let output = op.forward();
+        output
+    }
+}
 impl Sub for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
@@ -359,6 +368,15 @@ impl Sub for &Tensor {
     }
 }
 
+impl Sub<f32> for &Tensor {
+    type Output = Result<Tensor, OpForwardError>;
+
+    fn sub(self, other: f32) -> Self::Output {
+        let op = Op::Sub(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let output = op.forward();
+        output
+    }
+}
 impl Mul for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
@@ -389,6 +407,15 @@ impl Div for &Tensor {
     }
 }
 
+impl Div<f32> for &Tensor {
+    type Output = Result<Tensor, OpForwardError>;
+
+    fn div(self, other: f32) -> Self::Output {
+        let op = Op::Div(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let output = op.forward();
+        output
+    }
+}
 // note: picograd operations do not support `out` arg for "return oriented programming"
 impl Tensor {
     // ***transcendental***

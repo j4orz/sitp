@@ -42,9 +42,16 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
 class TestOps(unittest.TestCase):
     def test_add(self):
         assrt([(3,3), (3,3)], lambda x,y: x+y)
+    def test_add_scalar(self):
+        assrt([(3,3)], lambda x: x+8)
+        assrt([(3,3)], lambda x: x+-1)
 
     def test_sub(self):
         assrt([(3,3), (3,3)], lambda x,y: x-y)
+
+    def test_sub_scalar(self):
+        assrt([(3,3)], lambda x: x-8)
+        assrt([(3,3)], lambda x: x+-1)
 
     def test_mul(self):
         assrt([(3,3), (3,3)], lambda x,y: x*y)
@@ -57,6 +64,10 @@ class TestOps(unittest.TestCase):
 
     def test_div(self):
         assrt([(3,3), (3,3)], lambda x,y: x/y)
+
+    def test_div_scalar(self):
+        assrt([(3,3)], lambda x: x/8)
+        assrt([(3,3)], lambda x: x/-1)
 
     def test_matmul(self):
         # assrt([(64), (64,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
