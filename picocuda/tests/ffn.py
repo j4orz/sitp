@@ -8,10 +8,11 @@ T: sequence length
 
 # input/output
 V: vocabulary size
-E: embedding dimension
+E: embedding dimension (E != D in paper)
 D: model dimension
 """
 import picograd
+import torch # for .randint
 
 # *********************MODEL*********************
 # import matplotlib.pyplot as plt
@@ -69,8 +70,8 @@ model = [
     Linear(D, V, bias=False)
 ]
 
-C = picograd.randn((V,E)) #, generator=g)
-params = [C] + [p for l in model for p in l.parameters()]
+C_VE = picograd.randn((V,E)) #, generator=g)
+params = [C_VE] + [p for l in model for p in l.parameters()]
 for p in params:
     p.requires_grad = True
 
@@ -89,52 +90,59 @@ decode = { i:c for c,i in encode.items() }
 
 def gen_dataset(words):
     X, Y = [], []
-    for w in words[:3]:
+    for w in words[:10]:
         context = [0] * T;
         for c in w + '.':
             X.append(context)
             Y.append(encode[c])
-            # print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
+            print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
             context = context[1:] + [encode[c]]
 
     X, Y = picograd.tensor(X), picograd.tensor(Y) # X:(N,C) Y:(N)
-    return X, X
+    return X, Y
 
-random.seed(42)
-random.shuffle(words)
-n1, n2 = int(0.8*len(words)), int(0.9*len(words))
-Xtr, Ytr = gen_dataset(words[:n1])
-Xdev, Ydev = gen_dataset(words[n1:n2])
-Xte, Yte = gen_dataset(words[n2:])
+# random.seed(42)
+# random.shuffle(words)
+# n1, n2 = int(0.8*len(words)), int(0.9*len(words))
+X_NT, Y_N = gen_dataset(words)#[:n1])
+print(X_NT.shape, Y_N.shape)
+# Xdev, Ydev = gen_dataset(words[n1:n2])
+# Xte, Yte = gen_dataset(words[n2:])
 
-# # 2. training loop
-# N = Xtr.shape[0]
-# losses, steps = [], []
-# for step in range(200000):
-#     # 1. forward
-#     indices_B = picograd.randint(0, N, (B,)) # 6. picograd.randint
-#     X_B, Y_B = Xtr[indices_B], Ytr[indices_B]
+# 2. training loop
+losses, steps = [], []
+for step in range(100): #200000):
+    # 1. forward
+    # minibatch: X_NT -> X_BT
+    i_B = torch.randint(0, X_NT.shape[0], (B,))
+    X_BT, Y_B = X_NT[i_B], Y_N[i_B]
 
-#     X_BD = C[X_B].view(-1, T * E)
-#     for layer in model:
-#         X_BD = layer(X_BD)
-#     loss = F.cross_entropy(X_BD, Y_B) # 5. picograd.cross_entropy
+    # embed: X_BT -> X_BTE
+    X_BTE = C_VE[X_BT] # embed the B examples with T tokens range that span [0..27]
+                       # using 0..27 as indices into C_VE
+    X_BcTE = X_BTE.view(-1, T * E) #. concat
+    X = X_BcTE
 
-#     # 2. backward
-#     for layer in model:
-#         layer.out.retain_grad() # 6 .retain_grad()
-#     for p in params:
-#         p.grad = None
-#     loss.backward()
+    # X_BcTE -> X_BD -> X_BV (y_hat: logits)
+    for h in model:
+        X = h(X)
+    loss = F.cross_entropy(X, Y_B) # 5. picograd.cross_entropy
 
-#     # 3. update
-#     for p in params:
-#         p.data += -0.01 * p.grad
+    # # 2. backward
+    # for layer in model:
+    #     layer.out.retain_grad() # 6 .retain_grad()
+    # for p in params:
+    #     p.grad = None
+    # loss.backward()
 
-#     steps.append(step)
-#     losses.append(loss.log10().item())
-#     if step % 10000 == 0:
-#         print(f"step: {step}/{200000}, loss {loss.item()}")
+    # # 3. update
+    # for p in params:
+    #     p.data += -0.01 * p.grad
+
+    # steps.append(step)
+    # losses.append(loss.log10().item())
+    # if step % 10000 == 0:
+    #     print(f"step: {step}/{200000}, loss {loss.item()}")
 
 # plt.plot(steps, losses)
 
@@ -144,20 +152,23 @@ Xte, Yte = gen_dataset(words[n2:])
 #   if isinstance(layer, BatchNorm1D):
 #       layer.training = False
 
-token_terminal = 0
-for _ in range(20):
-  output, context = [], [0] * T
-  while True:
-        emb = C[picograd.tensor([context])]
-        X_BD = emb.view(emb.shape[0], -1) # 2. .view
-        for h in model:
-            X_BD = h(X_BD)
-            logits = X_BD
-            probs = F.softmax(logits, dim=1) # 3. softmax
+for _ in range(20): # 20 samples
+    output, context = [], [0] * T
+    while True:
+        X_1T = picograd.tensor([context]) # B=1 for inference, T=3, in [0..27] (clamped to 0 for init)
+        X_1TE = C_VE[X_1T] # using 0..27 as indices into C_VE for each B=1 example of context length T
+        X_1cTE = X_1TE.view(-1, T*E) # B=1, TE
+        X = X_1cTE
 
-            token = picograd.multinomial(probs, num_samples=1, replacement=True).item()#, generator=g).item() # 4. multinomial
-            context = context[1:] + [token]
-            output.append(decode[token])
-            if token == token_terminal:
-                break
-  print(''.join(output))
+        for h in model:
+            X = h(X)
+
+        y_hat = F.softmax(X, dim=1)
+
+        # sample and autoregressively update context
+        token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
+        context = context[1:] + [token]
+        output.append(decode[token])
+        if token == 0:
+            break
+    print(''.join(output))
