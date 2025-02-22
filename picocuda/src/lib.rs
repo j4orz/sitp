@@ -96,7 +96,24 @@ pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
 
-// TODO: remove usize for pythonic bindings?
+impl From<i32> for DtypeVal {
+    fn from(x: i32) -> Self {
+        DtypeVal::Int32(x)
+    }
+}
+
+impl From<i64> for DtypeVal {
+    fn from(x: i64) -> Self {
+        DtypeVal::Int64(x)
+    }
+}
+
+impl From<f32> for DtypeVal {
+    fn from(x: f32) -> Self {
+        DtypeVal::Float32(x)
+    }
+}
+
 impl From<DtypeVal> for f32 {
     fn from(value: DtypeVal) -> Self {
         match value {

@@ -155,18 +155,29 @@ impl Tensor {
 
 #[pyfunction]
 fn tensor<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
-    if let Ok(np) = data.downcast::<numpy::PyArrayDyn<f32>>() {
-        // cast once to PyArrayDyn<f32>
+    fn alloc_from_np<T: numpy::Element, 'py>(
+        np: &Bound<'py, numpy::PyArrayDyn<T>>,
+    ) -> PyResult<Tensor>
+    where
+        T: Into<DtypeVal> + Copy,
+    {
         let np = np.try_readonly()?;
         let (data, shape) = (
             np.as_slice()?
-                .to_vec()
-                .into_iter()
-                .map(DtypeVal::Float32) // cast twice to picograd::DtypeVal
-                .collect(),
+                .iter()
+                .map(|x| (*x).into())
+                .collect::<Vec<DtypeVal>>(),
             np.shape().to_vec(),
         );
         Ok(crate::alloc(&shape, data))
+    }
+
+    if let Ok(np) = data.downcast::<numpy::PyArrayDyn<i32>>() {
+        return alloc_from_np(np);
+    } else if let Ok(np) = data.downcast::<numpy::PyArrayDyn<i64>>() {
+        return alloc_from_np(np);
+    } else if let Ok(np) = data.downcast::<numpy::PyArrayDyn<f32>>() {
+        return alloc_from_np(np);
     } else if let Ok(pylist) = data.downcast::<PyList>() {
         let (mut data, mut shape) = (Vec::new(), Vec::new());
         flatten_pylist(pylist.as_any(), &mut data, &mut shape, 1)?;

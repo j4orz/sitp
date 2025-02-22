@@ -90,8 +90,15 @@ class TestBinOps(unittest.TestCase):
 # class TestReduceOps(unittest.TestCase):
 
 class TestViewOps(unittest.TestCase):
-    def foo(self):
-        pass
+    def test_getitem_tensorindex(self):
+        B, T, V, E = 32, 3, 27, 10 # embedding for character language model
+        C_VEtch, C_VEpg = torch.randn((V, E)), picograd.randn((V, E))
+
+        X_BT = np.random.randint(0, V, (B, T))
+        X_BTtch, X_BTpg = torch.tensor(X_BT), picograd.tensor(X_BT)
+        print(X_BTtch.shape, X_BTpg.shape)
+        X_BTEtch, X_BTEpg = C_VEtch[X_BTtch], C_VEpg[X_BTpg]
+        np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)
 
 # class TestNNOps(unittest.TestCase):
     # def test_cross_entropy(self):
