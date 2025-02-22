@@ -110,23 +110,23 @@ print(X_NT.shape, Y_N.shape)
 # Xte, Yte = gen_dataset(words[n2:])
 
 # 2. training loop
-losses, steps = [], []
-for step in range(100): #200000):
-    # 1. forward
-    # minibatch: X_NT -> X_BT
-    i_B = torch.randint(0, X_NT.shape[0], (B,))
-    X_BT, Y_B = X_NT[i_B], Y_N[i_B]
+# losses, steps = [], []
+# for step in range(100): #200000):
+#     # 1. forward
+#     # minibatch: X_NT -> X_BT
+#     i_B = torch.randint(0, X_NT.shape[0], (B,))
+#     X_BT, Y_B = X_NT[i_B], Y_N[i_B]
 
-    # embed: X_BT -> X_BTE
-    X_BTE = C_VE[X_BT] # embed the B examples with T tokens range that span [0..27]
-                       # using 0..27 as indices into C_VE
-    X_BcTE = X_BTE.view(-1, T * E) #. concat
-    X = X_BcTE
+#     # embed: X_BT -> X_BTE
+#     X_BTE = C_VE[X_BT] # embed the B examples with T tokens range that span [0..27]
+#                        # using 0..27 as indices into C_VE
+#     X_BcTE = X_BTE.view(-1, T * E) #. concat
+#     X = X_BcTE
 
-    # X_BcTE -> X_BD -> X_BV (y_hat: logits)
-    for h in model:
-        X = h(X)
-    loss = F.cross_entropy(X, Y_B) # 5. picograd.cross_entropy
+#     # X_BcTE -> X_BD -> X_BV (y_hat: logits)
+#     for h in model:
+#         X = h(X)
+#     loss = F.cross_entropy(X, Y_B) # 5. picograd.cross_entropy
 
     # # 2. backward
     # for layer in model:
@@ -155,7 +155,7 @@ for step in range(100): #200000):
 for _ in range(20): # 20 samples
     output, context = [], [0] * T
     while True:
-        X_1T = picograd.tensor([context]) # B=1 for inference, T=3, in [0..27] (clamped to 0 for init)
+        X_1T = picograd.tensor([context]) # B=1 for inference, T=3, in [0..27] (clamped to 0 for init))
         X_1TE = C_VE[X_1T] # using 0..27 as indices into C_VE for each B=1 example of context length T
         X_1cTE = X_1TE.view(-1, T*E) # B=1, TE
         X = X_1cTE

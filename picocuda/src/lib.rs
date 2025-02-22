@@ -103,7 +103,20 @@ impl From<DtypeVal> for f32 {
             DtypeVal::Float32(x) => x,
             DtypeVal::Int32(x) => x as f32,
             DtypeVal::Int64(x) => x as f32,
-            _ => todo!(),
+            _ => todo!(), // todo: panic?
+        }
+    }
+}
+
+impl From<DtypeVal> for usize {
+    fn from(value: DtypeVal) -> Self {
+        match value {
+            DtypeVal::Float32(x) => x as usize,
+            DtypeVal::Float64(x) => x as usize,
+            DtypeVal::Int16(x) => x as usize,
+            DtypeVal::Int32(x) => x as usize,
+            DtypeVal::Int64(x) => x as usize,
+            _ => todo!(), // todo: panic?
         }
     }
 }
@@ -223,6 +236,7 @@ impl Tensor {
             dtype: self.dtype.clone(),
         }
     }
+
     // TODO: transpose could produce non-contiguous?
     pub fn permute(&self, shape: &[usize]) -> Self {
         let new_shape = shape
@@ -238,8 +252,8 @@ impl Tensor {
         todo!()
     }
 
-    pub fn view(&self, shape: &[i32]) -> Self {
-        todo!()
+    pub fn view(&self, shape: &[usize]) -> Self {
+        self.no_alloc(shape)
     }
 
     pub fn reshape(&self, shape: &[usize]) -> Result<Self, io::Error> {

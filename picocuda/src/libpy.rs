@@ -5,7 +5,10 @@ use pyo3::{
     prelude::*,
     types::{PyList, PyTuple},
 };
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    iter,
+    ops::{Add, Div, Mul, Sub},
+};
 
 #[pymethods]
 impl Tensor {
@@ -14,23 +17,39 @@ impl Tensor {
     }
 
     // TODO: partial indexing return Tensor with one less dim
-    fn __getitem__(&self, log: Tensor) -> PyResult<DtypeVal> {
-        let log = log
-            .storage
-            .borrow()
-            .data
+    fn __getitem__(&self, I: Tensor) -> PyResult<Self> {
+        let output_shape = I
+            .shape
             .iter()
-            .map(|x| match x {
-                DtypeVal::Int16(x) => *x as usize,
-                DtypeVal::Int32(x) => *x as usize,
-                DtypeVal::Int64(x) => *x as usize,
-                DtypeVal::Bool(x) => panic!(),
-                DtypeVal::Float32(x) => *x as usize,
-                DtypeVal::Float64(x) => *x as usize,
-            })
+            .chain(self.shape.iter().skip(1)) // collapse the first dim of self via indexing
+            .copied()
             .collect::<Vec<_>>();
-        let phy = Self::decode(&log, &self.stride);
-        Ok(self.storage.borrow().data[phy].clone())
+        let output = crate::zeros(output_shape, Dtype::Float32);
+
+        {
+            let I_storage = I.storage.borrow();
+            let input_storage = self.storage.borrow();
+            let mut output_storage = output.storage.borrow_mut();
+
+            for phy_I in 0..I_storage.data.len() {
+                let i = usize::from(I_storage.data[phy_I]);
+                let (l, r) = (self.stride[0] * i, (self.stride[0] * i) + self.stride[0]);
+                let plucked_tensor = &input_storage.data[l..r];
+                // place plucked_tensor (nested ndarray) in output_storage
+
+                let log_I = Self::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
+                let log_output = log_I
+                    .iter()
+                    .chain(iter::repeat(&0).take(self.shape.len() - 1)) // input.shape.len()
+                    .copied()
+                    .collect::<Vec<_>>();
+
+                let phys_output = Self::decode(&log_output, &output.shape);
+                output_storage.data[phys_output..phys_output + plucked_tensor.len()]
+                    .copy_from_slice(plucked_tensor);
+            }
+        }
+        Ok(output)
     }
 
     #[getter]

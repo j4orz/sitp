@@ -16,7 +16,7 @@ fn main() {
     // ===forward:
     // -smell?: map_err: tensor/op error -> python error in lib_py.rs
     // -declarative rust module in lib_py.rs
-    // -go through all comments
+    // -go through all comments. TODO, todo!(), panic!()...
 
     // ===backward:
 
