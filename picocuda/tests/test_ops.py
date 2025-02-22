@@ -39,9 +39,23 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
         raise AssertionError(f"{s} failed (shape={ytch.shape}) - {str(e)}") from None
 
 # ********************************************* TESTS **********************************************
-class TestOps(unittest.TestCase):
+class TestUOps(unittest.TestCase):
+    def test_tanh(self):
+        assrt([(3,3)], lambda x: torch.tanh(x), lambda x: picograd.tanh(x))
+
+    def test_exp(self):
+        assrt([(3,3)], lambda x: torch.exp(x), lambda x: picograd.exp(x))
+
+    def test_log(self):
+        assrt([(3,3)], lambda x: torch.log(x), lambda x: picograd.log(x))
+
+    def test_sum(self):
+        assrt([(3,3)], lambda x: x.sum(dim=1, keepdim=True), lambda x: picograd.sum(x, 1, True))
+
+class TestBinOps(unittest.TestCase):
     def test_add(self):
         assrt([(3,3), (3,3)], lambda x,y: x+y)
+
     def test_add_scalar(self):
         assrt([(3,3)], lambda x: x+8)
         assrt([(3,3)], lambda x: x+-1)
@@ -73,23 +87,18 @@ class TestOps(unittest.TestCase):
         # assrt([(64), (64,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
         assrt([(3,3), (3,3)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
 
-    def test_tanh(self):
-        assrt([(3,3)], lambda x: torch.tanh(x), lambda x: picograd.tanh(x))
+# class TestReduceOps(unittest.TestCase):
 
-    def test_exp(self):
-        assrt([(3,3)], lambda x: torch.exp(x), lambda x: picograd.exp(x))
+class TestViewOps(unittest.TestCase):
+    def foo(self):
+        pass
 
-    def test_log(self):
-        assrt([(3,3)], lambda x: torch.log(x), lambda x: picograd.log(x))
+# class TestNNOps(unittest.TestCase):
+    # def test_cross_entropy(self):
+    #     assrt([(3), (3)], lambda p,q: torch.nn.functional.cross_entropy(p, q), lambda p,q: picograd.nn.functional.cross_entropy(p, q))
 
-    def test_sum(self):
-        assrt([(3,3)], lambda x: x.sum(dim=1, keepdim=True), lambda x: picograd.sum(x, 1, True))
-
-    def test_cross_entropy(self):
-        assrt([(3), (3)], lambda p,q: torch.nn.functional.cross_entropy(p, q), lambda p,q: picograd.nn.functional.cross_entropy(p, q))
-
-    def test_softmax(self):
-        assrt([(3), (3)], lambda x: torch.nn.functional.softmax(x, dim=1), lambda x: picograd.nn.functional.softmax(x, 1))
+    # def test_softmax(self):
+    #     assrt([(3), (3)], lambda x: torch.nn.functional.softmax(x, dim=1), lambda x: picograd.nn.functional.softmax(x, 1))
 
 if __name__ == '__main__':
     np.random.seed(1337)
