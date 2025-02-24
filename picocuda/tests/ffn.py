@@ -32,31 +32,31 @@ V, E, D = 27, 10, 200
 # -> b/c initialization is fragile/intractable with *deep* neural networks
 
 class Linear:
-    def __init__(self, D_in, D_out, bias=True):
-        # TODO: generator self.W_DiDo = picograd.randn((D_in, D_out), generator=g) * (5/3)/D_in**0.5 # kaiming init (He et al. 2015)
-        self.W_DiDo = picograd.randn((D_in, D_out)) * (5/3)/D_in**0.5 # kaiming init (He et al. 2015)
-        self.b_Do = picograd.zeros(D_out) if bias else None
+  def __init__(self, D_in, D_out, bias=True):
+    # TODO: generator self.W_DiDo = picograd.randn((D_in, D_out), generator=g) * (5/3)/D_in**0.5 # kaiming init (He et al. 2015)
+    self.W_DiDo = picograd.randn((D_in, D_out)) * (5/3)/D_in**0.5 # kaiming init (He et al. 2015)
+    self.b_Do = picograd.zeros(D_out) if bias else None
 
-    def __call__(self, X_Di):
-        self.X_Do = X_Di @ self.W_DiDo
-        if self.b_Do is not None:
-            self.X_Do += self.b_Do
-        self.out = self.X_Do
-        return self.X_Do
+  def __call__(self, X_Di):
+    self.X_Do = X_Di @ self.W_DiDo
+    if self.b_Do is not None:
+        self.X_Do += self.b_Do
+    self.out = self.X_Do
+    return self.X_Do
 
-    def parameters(self):
-        return [self.W_DiDo] + ([] if self.b_Do is None else [self.b_Do])
+  def parameters(self):
+    return [self.W_DiDo] + ([] if self.b_Do is None else [self.b_Do])
 
 class Tanh:
-    def __call__(self, X_BD):
-        self.X_BD = picograd.tanh(X_BD)
-        # plt.hist(self.X_BD.view(-1).tolist(), 50); # distribution of weights
-        # plt.imshow(self.X_BD.abs() > 0.99, cmap='gray', interpolation='nearest') # vanishing gradients
-        self.out = self.X_BD
-        return self.X_BD
-    
-    def parameters(self):
-        return []
+  def __call__(self, X_BD):
+    self.X_BD = picograd.tanh(X_BD)
+    # plt.hist(self.X_BD.view(-1).tolist(), 50); # distribution of weights
+    # plt.imshow(self.X_BD.abs() > 0.99, cmap='gray', interpolation='nearest') # vanishing gradients
+    self.out = self.X_BD
+    return self.X_BD
+  
+  def parameters(self):
+    return []
 
 # model = [
 #     Linear(T * E, D, bias=False), BatchNorm1D(D), Tanh(),
@@ -65,9 +65,9 @@ class Tanh:
 # ]
 
 model = [
-    Linear(T * E, D, bias=False), Tanh(),
-    Linear(D, D, bias=False), Tanh(),
-    Linear(D, V, bias=False)
+  Linear(T * E, D, bias=False), Tanh(),
+  Linear(D, D, bias=False), Tanh(),
+  Linear(D, V, bias=False)
 ]
 
 C_VE = picograd.randn((V,E)) #, generator=g)
@@ -89,17 +89,17 @@ encode['.'] = 0
 decode = { i:c for c,i in encode.items() }
 
 def gen_dataset(words):
-    X, Y = [], []
-    for w in words[:10]:
-        context = [0] * T;
-        for c in w + '.':
-            X.append(context)
-            Y.append(encode[c])
-            print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
-            context = context[1:] + [encode[c]]
+  X, Y = [], []
+  for w in words[:10]:
+    context = [0] * T;
+    for c in w + '.':
+      X.append(context)
+      Y.append(encode[c])
+      print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
+      context = context[1:] + [encode[c]]
 
-    X, Y = picograd.tensor(X), picograd.tensor(Y) # X:(N,C) Y:(N)
-    return X, Y
+  X, Y = picograd.tensor(X), picograd.tensor(Y) # X:(N,C) Y:(N)
+  return X, Y
 
 # random.seed(42)
 # random.shuffle(words)
@@ -153,22 +153,24 @@ print(X_NT.shape, Y_N.shape)
 #       layer.training = False
 
 for _ in range(20): # 20 samples
-    output, context = [], [0] * T
-    while True:
-        X_1T = picograd.tensor([context]) # B=1 for inference, T=3, in [0..27] (clamped to 0 for init))
-        X_1TE = C_VE[X_1T] # using 0..27 as indices into C_VE for each B=1 example of context length T
-        X_1cTE = X_1TE.view(-1, T*E) # B=1, TE
-        X = X_1cTE
+  output, context = [], [0] * T
+  while True:
+    X_1T = picograd.tensor([context]) # B=1 for inference, T=3, in [0..27] (clamped to 0 for init))
+    X_1TE = C_VE[X_1T] # using 0..27 as indices into C_VE for each B=1 example of context length T
+    print(X_1TE.shape)
+    print(X_1TE)
+    X_1cTE = X_1TE.view(-1, T*E) # B=1, TE
+    X = X_1cTE
 
-        for h in model:
-            X = h(X)
+    for h in model:
+      X = h(X)
 
-        y_hat = F.softmax(X, dim=1)
+    y_hat = F.softmax(X, dim=1)
 
-        # sample and autoregressively update context
-        token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
-        context = context[1:] + [token]
-        output.append(decode[token])
-        if token == 0:
-            break
-    print(''.join(output))
+    # sample and autoregressively update context
+    token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
+    context = context[1:] + [token]
+    output.append(decode[token])
+    if token == 0:
+        break
+  print(''.join(output))
