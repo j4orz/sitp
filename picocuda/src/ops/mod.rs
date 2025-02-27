@@ -1,9 +1,9 @@
-pub mod cpu;
-pub mod cuda;
-pub mod gpu;
+pub mod cpu_ops;
+pub mod cuda_ops;
+pub mod gpu_ops;
 
 use crate::{DtypeVal, Tensor};
-use cpu::{forward_cpu, OpForwardError};
+use cpu_ops::{forward_cpu, OpForwardError};
 use std::{
     hash,
     ops::{Add, Div, Mul, Neg, Sub},
