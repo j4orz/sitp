@@ -1,10 +1,11 @@
 pub mod differentiator;
 pub mod libpy;
 pub mod nn;
+pub mod ops;
 // pub mod optimzer;
 
-use differentiator::Op;
 use numpy::{IntoPyArray, PyArrayMethods};
+use ops::Op;
 use pyo3::prelude::*;
 use rand::distr::StandardUniform;
 use rand::Rng;
@@ -78,7 +79,7 @@ impl Display for Tensor {
 #[rustfmt::skip]
 #[pyclass(eq)]
 #[derive(Clone, Debug, PartialEq)]
-pub enum Device { Cpu, Cuda, Mps }
+pub enum Device { Cpu, Gpu, Cuda, }
 
 #[rustfmt::skip]
 #[pyclass(eq)]
@@ -226,10 +227,20 @@ impl Tensor {
 }
 
 impl Tensor {
-    // alloc
+    pub fn to(&self, d: &Device) -> Self {
+        let foo = match d {
+            Device::Cpu => todo!(),
+            Device::Gpu => todo!(),
+            Device::Cuda => todo!(),
+        };
+
+        todo!()
+    }
+
     fn numel(&self) -> usize {
         self.shape.iter().product::<usize>()
     }
+
     // *****************************************************************************************************************
     // ***************************************** VIEWS (no alloc/datamovement) *****************************************
     // *****************************************************************************************************************
