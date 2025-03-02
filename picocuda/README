@@ -1,4 +1,4 @@
-picograd: picograd.tensor->PTX compiler
+picograd: tensor->{WGSL/CUDA} interpreter and compiler
 disclaimer: this is a one man effort to compile gpt2, llama2, and r1. beware of dragons.
 versions:
 - 0.1.1: hackable. gpt2able.
