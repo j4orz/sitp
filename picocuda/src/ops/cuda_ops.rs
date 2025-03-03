@@ -5,7 +5,7 @@ use thiserror::Error;
 
 pub fn forward_cuda(op: &Op) -> Result<Tensor, OpForwardError> {
     match op {
-        Op::Add(x, y) => {}
+        Op::Add(x, y) => todo!(),
         Op::Sub(x, y) => todo!(),
         Op::Mul(x, y) => todo!(),
         Op::Div(x, y) => todo!(),

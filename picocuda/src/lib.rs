@@ -5,7 +5,7 @@ pub mod ops;
 // pub mod optimzer;
 
 use numpy::{IntoPyArray, PyArrayMethods};
-use ops::cuda_ops::forward_cuda;
+use ops::Op;
 use pyo3::prelude::*;
 use rand::distr::StandardUniform;
 use rand::Rng;
