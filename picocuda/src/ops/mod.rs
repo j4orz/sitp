@@ -1,13 +1,15 @@
 pub mod cpu_ops;
 pub mod cuda_ops;
-pub mod gpu_ops;
+pub mod wgsl_ops;
 
-use crate::{DtypeVal, Tensor};
+use crate::{Device, DtypeVal, Tensor};
 use cpu_ops::{forward_cpu, OpForwardError};
+use cuda_ops::forward_cuda;
 use std::{
     hash,
     ops::{Add, Div, Mul, Neg, Sub},
 };
+use wgsl_ops::forward_wgsl;
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
@@ -61,9 +63,9 @@ impl hash::Hash for Op {
 impl Tensor {
     fn forward(&self, op: &Op) -> Result<Tensor, OpForwardError> {
         match self.device {
-            crate::Device::Cpu => forward_cpu(op),
-            _ => todo!(), // crate::Device::Gpu => forward_gpu(op),
-                          // crate::Device::Cuda => forward_cuda(op),
+            Device::Cpu => forward_cpu(op),
+            Device::Gpu => forward_wgsl(op),
+            Device::Cuda => forward_cuda(op),
         }
     }
 }

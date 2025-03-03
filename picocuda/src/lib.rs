@@ -5,7 +5,7 @@ pub mod ops;
 // pub mod optimzer;
 
 use numpy::{IntoPyArray, PyArrayMethods};
-use ops::Op;
+use ops::cuda_ops::forward_cuda;
 use pyo3::prelude::*;
 use rand::distr::StandardUniform;
 use rand::Rng;
@@ -18,7 +18,6 @@ use std::{
     rc::Rc,
 };
 use thiserror::Error;
-
 // - lifetime: deallocation semantics
 //   - Box<_>: N/A (exclusive ownership)
 //   - Rc<_>: reference counting

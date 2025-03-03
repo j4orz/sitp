@@ -1,11 +1,12 @@
-use crate::ops::{Op, OpForwardError};
-use crate::Tensor;
-use cudarc::driver;
-use thiserror::Error;
+use crate::{
+    ops::{Op, OpForwardError},
+    Tensor,
+};
+use wgpu::{self, Instance, InstanceDescriptor};
 
-pub fn forward_cuda(op: &Op) -> Result<Tensor, OpForwardError> {
+pub fn forward_wgsl(op: &Op) -> Result<Tensor, OpForwardError> {
     match op {
-        Op::Add(x, y) => {}
+        Op::Add(x, y) => todo!(),
         Op::Sub(x, y) => todo!(),
         Op::Mul(x, y) => todo!(),
         Op::Div(x, y) => todo!(),
