@@ -1,25 +1,22 @@
 pub mod cpu_ops;
-pub mod cuda_ops;
-pub mod wgsl_ops;
+// pub mod cuda_ops;
+// pub mod wgsl_ops;
 
-use crate::{Device, DtypeVal, Tensor};
-use cpu_ops::{forward_cpu, OpForwardError};
-use cuda_ops::forward_cuda;
+use crate::tensor::{self, Device, DtypeVal, Tensor};
+use cpu_ops::{OpForwardError, forward_cpu};
+// use cuda_ops::forward_cuda;
 use std::{
     hash,
     ops::{Add, Div, Mul, Neg, Sub},
 };
-use wgsl_ops::forward_wgsl;
+// use wgsl_ops::forward_wgsl;
 
 #[rustfmt::skip]
 #[derive(Clone, Debug)]
 pub enum Op {
-    // ***desugared core***
-    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binary maps: algebraic
-    // ***sugar***
-    // (can be desugared to algebraic via power series — contra calc teachers taylor series)
-    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // unary zips: transcendental
-    Sum(Tensor, usize, bool),
+    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binops (zip)
+    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // uops (map)
+    Sum(Tensor, usize, bool), // reduce
     // Mean(Tensor), Var(Tensor), // statistics
     // Dot
 }
@@ -64,8 +61,9 @@ impl Tensor {
     fn forward(&self, op: &Op) -> Result<Tensor, OpForwardError> {
         match self.device {
             Device::Cpu => forward_cpu(op),
-            Device::Gpu => forward_wgsl(op),
-            Device::Cuda => forward_cuda(op),
+            // Device::Gpu => forward_wgsl(op),
+            // Device::Cuda => forward_cuda(op),
+            _ => todo!(),
         }
     }
 }
@@ -94,7 +92,7 @@ impl Add<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn add(self, other: f32) -> Self::Output {
-        let op = Op::Add(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Add(self.clone(), tensor::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }
@@ -113,7 +111,7 @@ impl Sub<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn sub(self, other: f32) -> Self::Output {
-        let op = Op::Sub(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Sub(self.clone(), tensor::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }
@@ -132,7 +130,7 @@ impl Mul<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn mul(self, other: f32) -> Self::Output {
-        let op = Op::Mul(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Mul(self.clone(), tensor::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }
@@ -152,7 +150,7 @@ impl Div<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn div(self, other: f32) -> Self::Output {
-        let op = Op::Div(self.clone(), crate::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Div(self.clone(), tensor::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }

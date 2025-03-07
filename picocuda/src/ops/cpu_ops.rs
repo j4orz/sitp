@@ -1,4 +1,7 @@
-use crate::{ops::Op, Dtype, DtypeVal, Storage, Tensor, TensorError};
+use crate::{
+    ops::Op,
+    tensor::{self, Dtype, DtypeVal, Storage, Tensor, TensorError},
+};
 use std::{
     cell::RefCell,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub},
@@ -117,7 +120,7 @@ pub fn forward_cpu(op: &Op) -> Result<Tensor, OpForwardError> {
             assert_eq!(X.ndim, 2, "X must be a 2D tensor");
             assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
 
-            let Z = crate::zeros(vec![n, p], Dtype::Float32);
+            let Z = tensor::zeros(vec![n, p], Dtype::Float32);
 
             {
                 let (X_storage, Y_storage, mut Z_storage) = (
@@ -184,7 +187,7 @@ where
 {
     let (x, y, z) = if x.shape != y.shape {
         let z_shape = Tensor::broadcast_shape(&x.shape, &y.shape)?;
-        let z = crate::zeros(z_shape, Dtype::Float32); // clone because of python/rust memory mismatch
+        let z = tensor::zeros(z_shape, Dtype::Float32); // clone because of python/rust memory mismatch
 
         let (x_stride, y_stride) = (
             Tensor::clamp_stride(&x.shape),
@@ -197,7 +200,7 @@ where
 
         (x, y, z)
     } else {
-        let z = crate::zeros(x.shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
+        let z = tensor::zeros(x.shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
         (x.clone(), y.clone(), z) // TODO: possibly remove taking view just to satisfy typechecker
     };
 
@@ -252,7 +255,7 @@ where
         .enumerate()
         .map(|(i, &dim_size)| if i == dim_reduce { 1 } else { dim_size })
         .collect();
-    let mut y = crate::zeros(y_shape, Dtype::Float32); // clone because of python/rust memory mismatch
+    let mut y = tensor::zeros(y_shape, Dtype::Float32); // clone because of python/rust memory mismatch
 
     {
         let (x_storage, mut y_storage) = (x.storage.borrow(), y.storage.borrow_mut());

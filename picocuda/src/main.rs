@@ -1,4 +1,4 @@
-use picograd::Device;
+use picograd::tensor::Device;
 
 fn main() {
     println!(
@@ -21,13 +21,12 @@ fn main() {
     // -go through all comments. TODO, todo!(), panic!()...
 
     // ===backward:
-
     // speed: CPU perf
     // SSE, AVX, AVX2, AVX512, ARM
 
     let device = Device::Gpu;
-    let X = picograd::ones(vec![3, 1]);
-    let Y = picograd::ones(vec![1, 3]);
+    let X = picograd::tensor::ones(vec![3, 1]);
+    let Y = picograd::tensor::ones(vec![1, 3]);
 
     let X = X.to(&device);
     let X = Y.to(&device);

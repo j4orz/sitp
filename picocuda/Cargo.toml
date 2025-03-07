@@ -1,7 +1,7 @@
 [package]
 name = "picograd"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
@@ -10,7 +10,6 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cudarc = {version = "0.13.9", features = ["cuda-version-from-build-system"] }
 numpy = "0.23.0"
 pyo3 = { version = "0.23.3", features = ["multiple-pymethods"] }
 rand = "0.9.0"

@@ -4,7 +4,10 @@
 
 use std::collections::HashSet;
 
-use crate::{ops::Op, DtypeVal, Tensor};
+use crate::{
+    ops::Op,
+    tensor::{self, DtypeVal, Tensor},
+};
 
 // autodifferentiation is algorithmic but uses numerical objects, not symbolic.
 impl Tensor {
@@ -23,7 +26,7 @@ impl Tensor {
     // reversemode/forwardmode is same for \mathbb{R} because of associativity
     // but with \mahtbb{R^{nxm}} you have to make sure matrices are associative
     pub fn backward(&mut self) -> () {
-        self.storage.borrow_mut().grad = Some(crate::ones(self.shape.clone())); // base case dfdx. // clone because of python/rust memory mismatch
+        self.storage.borrow_mut().grad = Some(tensor::ones(self.shape.clone())); // base case dfdx. // clone because of python/rust memory mismatch
         let (mut topo, mut visited) = (Vec::new(), HashSet::new());
         self.topo(&mut topo, &mut visited);
 
@@ -73,8 +76,8 @@ impl Op {
             Op::Add(_x, _y) => {
                 // d/dx(x + y) = 1, d/dy(x + y) = 1
                 let (dx, dy) = (
-                    crate::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
-                    crate::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    tensor::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    tensor::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
                 );
                 vec![
                     (&dx * &grad.clone()).unwrap(),
@@ -84,8 +87,8 @@ impl Op {
             Op::Sub(_x, _y) => {
                 // d/dx(x - y) = 1, d/dy(x - y) = -1
                 let (dx, dy) = (
-                    crate::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
-                    crate::new(vec![DtypeVal::Float32(-1.0); grad.numel()]),
+                    tensor::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    tensor::new(vec![DtypeVal::Float32(-1.0); grad.numel()]),
                 );
                 vec![
                     (&dx * &grad.clone()).unwrap(),

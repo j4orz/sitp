@@ -1,6 +1,6 @@
-use pyo3::{exceptions::PyRuntimeError, pyfunction, PyResult};
+use pyo3::{PyResult, exceptions::PyRuntimeError, pyfunction};
 
-use crate::Tensor;
+use crate::tensor::Tensor;
 
 #[pyfunction]
 pub fn cross_entropy(p: Tensor, q: Tensor) -> PyResult<Tensor> {

@@ -3,6 +3,20 @@ use crate::Tensor;
 use cudarc::driver;
 use thiserror::Error;
 
+use cudarc::driver;
+use once_cell::sync::Lazy;
+use std::sync::Mutex;
+
+static DEVICE: Lazy<Mutex<driver::CudaDevice>> =
+    Lazy::new(|| Mutex::new(driver::CudaDevice::new(0).expect("Failed to initialize CUDA Device")));
+
+#[pyfunction]
+fn forward(op: &Op) -> PyResult<Tensor> {
+    let device = DEVICE.lock().unwrap();
+    // ...
+    Ok(todo!())
+}
+
 pub fn forward_cuda(op: &Op) -> Result<Tensor, OpForwardError> {
     match op {
         Op::Add(x, y) => todo!(),
