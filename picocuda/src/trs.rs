@@ -1,7 +1,6 @@
 // pub mod optimzer;
 
-use crate::ops::Op;
-use numpy::{IntoPyArray, PyArrayMethods};
+use crate::{Device, Dtype, DtypeVal, Layout, ops::Op};
 use pyo3::prelude::*;
 use rand::Rng;
 use rand::distr::StandardUniform;
@@ -69,71 +68,6 @@ impl Display for Tensor {
     }
 }
 
-// ********************************************* physical types **********************************************
-
-#[rustfmt::skip]
-#[pyclass(eq)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Device { Cpu, Gpu, Cuda, }
-
-#[rustfmt::skip]
-#[pyclass(eq)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Layout { Strided  } // Sparse, // MklDnn
-
-#[rustfmt::skip]
-#[pyclass(eq)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
-
-#[rustfmt::skip]
-#[derive(FromPyObject)]
-#[derive(IntoPyObject)]
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
-
-impl From<i32> for DtypeVal {
-    fn from(x: i32) -> Self {
-        DtypeVal::Int32(x)
-    }
-}
-
-impl From<i64> for DtypeVal {
-    fn from(x: i64) -> Self {
-        DtypeVal::Int64(x)
-    }
-}
-
-impl From<f32> for DtypeVal {
-    fn from(x: f32) -> Self {
-        DtypeVal::Float32(x)
-    }
-}
-
-impl From<DtypeVal> for f32 {
-    fn from(value: DtypeVal) -> Self {
-        match value {
-            DtypeVal::Float32(x) => x,
-            DtypeVal::Int32(x) => x as f32,
-            DtypeVal::Int64(x) => x as f32,
-            _ => todo!(), // todo: panic?
-        }
-    }
-}
-
-impl From<DtypeVal> for usize {
-    fn from(value: DtypeVal) -> Self {
-        match value {
-            DtypeVal::Float32(x) => x as usize,
-            DtypeVal::Float64(x) => x as usize,
-            DtypeVal::Int16(x) => x as usize,
-            DtypeVal::Int32(x) => x as usize,
-            DtypeVal::Int64(x) => x as usize,
-            _ => todo!(), // todo: panic?
-        }
-    }
-}
-
 // *****************************************************************************************************************
 // ********************************************* CONSTRUCTORS (alloc) **********************************************
 // *****************************************************************************************************************
@@ -189,38 +123,6 @@ pub fn arange(start: f32, end: f32, step: f32) -> Tensor {
     todo!()
 }
 
-#[pymethods]
-impl Tensor {
-    fn numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, numpy::PyArrayDyn<f32>>> {
-        // todo: why does pytorch need to detatch first?
-        let data = self
-            .storage
-            .borrow()
-            .data
-            .iter()
-            .map(|&x| x.into())
-            .collect::<Vec<f32>>();
-
-        let np_flat = data.into_pyarray(py).to_dyn().to_owned();
-        let np_shaped = np_flat.reshape(self.shape.clone())?;
-        Ok(np_shaped)
-    }
-
-    pub fn detach(&self) -> Self {
-        Self {
-            ndim: self.ndim,
-            shape: self.shape.clone(),
-            stride: self.stride.clone(),
-            input_op: None, // detach
-            requires_grad: self.requires_grad,
-            storage: self.storage.clone(),
-            device: self.device.clone(),
-            layout: self.layout.clone(),
-            dtype: self.dtype.clone(),
-        }
-    }
-}
-
 impl Tensor {
     pub fn to(&self, d: &Device) -> Self {
         let foo = match d {
@@ -243,10 +145,7 @@ impl Tensor {
     // - https://numpy.org/doc/stable/user/basics.copies.html
     // - https://pytorch.org/docs/stable/tensor_view.html
 
-    // TODO: permute, reshape, should be "HLOp".??
-    // only operate on the tensor shape. not data.
-
-    fn no_alloc(&self, shape: &[usize]) -> Self {
+    pub fn no_alloc(&self, shape: &[usize]) -> Self {
         Self {
             ndim: shape.len(),
             shape: shape.to_vec(),
@@ -273,10 +172,6 @@ impl Tensor {
     // TODO: ??
     pub fn contiguous(&self) -> Self {
         todo!()
-    }
-
-    pub fn view(&self, shape: &[usize]) -> Self {
-        self.no_alloc(shape)
     }
 
     pub fn reshape(&self, shape: &[usize]) -> Result<Self, io::Error> {
