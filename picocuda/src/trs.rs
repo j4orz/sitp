@@ -139,9 +139,6 @@ impl Tensor {
     // *****************************************************************************************************************
     // ***************************************** VIEWS (no alloc/datamovement) *****************************************
     // *****************************************************************************************************************
-    // see:
-    // - https://numpy.org/doc/stable/user/basics.copies.html
-    // - https://pytorch.org/docs/stable/tensor_view.html
 
     pub fn no_alloc(&self, shape: &[usize]) -> Self {
         Self {
@@ -157,18 +154,7 @@ impl Tensor {
         }
     }
 
-    // TODO: transpose could produce non-contiguous?
-    pub fn permute(&self, shape: &[usize]) -> Self {
-        let new_shape = shape
-            .iter()
-            .map(|&old_dim| self.shape[old_dim])
-            .collect::<Vec<_>>();
-
-        self.no_alloc(&new_shape)
-    }
-
-    // TODO: ??
-    pub fn contiguous(&self) -> Self {
+    pub fn view(&self) -> Self {
         todo!()
     }
 
@@ -183,6 +169,55 @@ impl Tensor {
         }
 
         Ok(self.no_alloc(shape))
+    }
+
+    pub fn permute(&self, shape: &[usize]) -> Self {
+        let new_shape = shape
+            .iter()
+            .map(|&old_dim| self.shape[old_dim])
+            .collect::<Vec<_>>();
+
+        self.no_alloc(&new_shape)
+    }
+
+    pub fn transpose(&self) -> Self {
+        todo!()
+    }
+
+    pub fn gather(&self) -> Self {
+        todo!()
+    }
+
+    pub fn scatter(&self) -> Self {
+        todo!()
+    }
+
+    pub fn cat(&self) -> Self {
+        todo!()
+    }
+
+    pub fn stack(&self) -> Self {
+        todo!()
+    }
+
+    pub fn squeeze(&self) -> Self {
+        todo!()
+    }
+
+    pub fn unsqueeze(&self) -> Self {
+        todo!()
+    }
+
+    pub fn flatten(&self) -> Self {
+        todo!()
+    }
+
+    pub fn unflatten(&self) -> Self {
+        todo!()
+    }
+
+    pub fn contiguous(&self) -> Self {
+        todo!()
     }
 
     fn format(
@@ -362,12 +397,6 @@ impl Index<&[usize]> for Tensor {
     type Output = DtypeVal;
 
     fn index(&self, i: &[usize]) -> &Self::Output {
-        let output_shape = i
-            .shape
-            .iter()
-            .chain(.shape.iter().skip(1)) // collapse the first dim of self via indexing
-            .copied()
-            .collect::<Vec<_>>();
         todo!()
     }
 }
