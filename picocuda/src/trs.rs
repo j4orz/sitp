@@ -358,12 +358,17 @@ pub enum TensorError {
     Unknown,
 }
 
-impl Index<Vec<usize>> for Tensor {
+impl Index<&[usize]> for Tensor {
     type Output = DtypeVal;
 
-    fn index(&self, index: Vec<usize>) -> &Self::Output {
-        let phy = Self::decode(&index, &self.stride);
-        unsafe { &self.storage.try_borrow_unguarded().unwrap().data[phy] }
+    fn index(&self, i: &[usize]) -> &Self::Output {
+        let output_shape = i
+            .shape
+            .iter()
+            .chain(.shape.iter().skip(1)) // collapse the first dim of self via indexing
+            .copied()
+            .collect::<Vec<_>>();
+        todo!()
     }
 }
 
@@ -374,3 +379,39 @@ impl Index<Vec<usize>> for Tensor {
 //         &mut self.data[idx]
 //     }
 // }
+
+// TODO: partial indexing return Tensor with one less dim
+fn __getitem__(s: &Tensor, I: Tensor) -> Tensor {
+    let output_shape = I
+        .shape
+        .iter()
+        .chain(s.shape.iter().skip(1)) // collapse the first dim of self via indexing
+        .copied()
+        .collect::<Vec<_>>();
+    let output = zeros(output_shape, Dtype::Float32);
+
+    {
+        let I_storage = I.storage.borrow();
+        let input_storage = s.storage.borrow();
+        let mut output_storage = output.storage.borrow_mut();
+
+        for phy_I in 0..I_storage.data.len() {
+            let i = usize::from(I_storage.data[phy_I]);
+            let (l, r) = (s.stride[0] * i, (s.stride[0] * i) + s.stride[0]);
+            let plucked_tensor = &input_storage.data[l..r];
+            // place plucked_tensor (nested ndarray) in output_storage
+
+            let log_I = Tensor::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
+            let log_output = log_I
+                .iter()
+                .chain(iter::repeat(&0).take(s.shape.len() - 1)) // input.shape.len()
+                .copied()
+                .collect::<Vec<_>>();
+
+            let phys_output = Tensor::decode(&log_output, &output.shape);
+            output_storage.data[phys_output..phys_output + plucked_tensor.len()]
+                .copy_from_slice(plucked_tensor);
+        }
+    }
+    output
+}

@@ -6,7 +6,6 @@ use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyTuple};
 use std::ops::{Add, Div, Mul, Sub};
 
 // forward---
-// 1. error mapping
 // 2. indexing on trs (TEST)
 // 3. view on trs (TEST)
 // 4. softmax (TEST)
@@ -59,41 +58,9 @@ impl Tensor {
         Ok(format!("{}", self))
     }
 
-    // TODO: partial indexing return Tensor with one less dim
-    // fn __getitem__(&self, I: Tensor) -> PyResult<Self> {
-    //     let output_shape = I
-    //         .shape
-    //         .iter()
-    //         .chain(self.shape.iter().skip(1)) // collapse the first dim of self via indexing
-    //         .copied()
-    //         .collect::<Vec<_>>();
-    //     let output = trs::zeros(output_shape, Dtype::Float32);
-
-    //     {
-    //         let I_storage = I.storage.borrow();
-    //         let input_storage = self.storage.borrow();
-    //         let mut output_storage = output.storage.borrow_mut();
-
-    //         for phy_I in 0..I_storage.data.len() {
-    //             let i = usize::from(I_storage.data[phy_I]);
-    //             let (l, r) = (self.stride[0] * i, (self.stride[0] * i) + self.stride[0]);
-    //             let plucked_tensor = &input_storage.data[l..r];
-    //             // place plucked_tensor (nested ndarray) in output_storage
-
-    //             let log_I = Self::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
-    //             let log_output = log_I
-    //                 .iter()
-    //                 .chain(iter::repeat(&0).take(self.shape.len() - 1)) // input.shape.len()
-    //                 .copied()
-    //                 .collect::<Vec<_>>();
-
-    //             let phys_output = Self::decode(&log_output, &output.shape);
-    //             output_storage.data[phys_output..phys_output + plucked_tensor.len()]
-    //                 .copy_from_slice(plucked_tensor);
-    //         }
-    //     }
-    //     Ok(output)
-    // }
+    fn __getitem__(&self, I: Tensor) -> PyResult<Self> {
+        todo!()
+    }
 
     #[getter]
     fn ndim(&self) -> usize {

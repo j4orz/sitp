@@ -39,6 +39,46 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
       raise AssertionError(f"{s} failed (shape={ytch.shape}) - {str(e)}") from None
 
 # ********************************************* TESTS **********************************************
+class TestViewOps(unittest.TestCase):
+  def test_view():
+    pass
+
+  def test_reshape():
+    pass
+
+  def test_permute():
+    pass
+
+  def test_transpose():
+    pass
+
+  def test_getitem():
+    pass
+
+  def test_gather():
+    pass
+
+  def test_scatter():
+    pass
+
+  def test_cat():
+    pass
+
+  def test_stack():
+    pass
+
+  def test_squeeze():
+    pass
+
+  def test_unsqueeze():
+    pass
+
+  def test_flatten():
+    pass
+
+  def test_unflatten():
+    pass
+
 class TestUOps(unittest.TestCase):
   def test_tanh(self):
     assrt([(3,3)], lambda x: torch.tanh(x), lambda x: picograd.tanh(x))
@@ -84,21 +124,95 @@ class TestBinOps(unittest.TestCase):
     assrt([(3,3)], lambda x: x/-1)
 
   def test_matmul(self):
-    # assrt([(64), (64,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
+    # assrt([(64), (6k4,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
     assrt([(3,3), (3,3)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
 
-# class TestReduceOps(unittest.TestCase):
+class TestReduceOps(unittest.TestCase):
+  def test_sum():
+    pass
 
-# class TestViewOps(unittest.TestCase):
-#   def test_getitem_tensorindex(self):
-#   B, T, V, E = 32, 3, 27, 10 # embedding for character language model
-#   C_VEtch, C_VEpg = torch.randn((V, E)), picograd.randn((V, E))
+  def test_prod():
+    pass
 
-#   X_BT = np.random.randint(0, V, (B, T))
-#   X_BTtch, X_BTpg = torch.tensor(X_BT), picograd.tensor(X_BT)
-#   print(X_BTtch.shape, X_BTpg.shape)
-#   X_BTEtch, X_BTEpg = C_VEtch[X_BTtch], C_VEpg[X_BTpg]
-#   np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)
+  def test_max():
+    pass
+
+  def test_min():
+    pass
+
+  def test_mean():
+    pass
+
+  def test_var():
+    pass
+
+  def test_std():
+    pass
+
+  def test_softmax():
+    pass
+
+  def test_argmax():
+    pass
+
+  def test_logsumexp():
+    pass
+
+  def test_logcumsumexp():
+    pass
+
+class TestProcessingOps(unittest.TestCase):
+  def test_matmul():
+    pass
+
+  def test_dot():
+    pass
+
+  # def test_conv2d():
+  #   pass
+
+  # def test_avgpool2d():
+  #   pass
+
+  # def test_maxpool2d():
+  #   pass
+
+  def test_topk():
+    pass
+
+class TestNetworkOps(unittest.TestCase):
+  def test_linear():
+    pass
+
+  def test_sequential():
+    pass
+
+  def test_layernorm():
+    pass
+
+  def test_batchnorm():
+    pass
+
+  def test_crossentropyloss():
+    pass
+
+  def test_nllloss():
+    pass
+  
+
+  # def test_getitem_tensorindex(self):
+  #   B, T, V, E = 32, 3, 27, 10 # embedding for character language model
+  #   C_VEtch, C_VEpg = torch.randn((V, E)), picograd.randn((V, E))
+
+  #   X_BT = np.random.randint(0, V, (B, T))
+  #   X_BTtch, X_BTpg = torch.tensor(X_BT), picograd.tensor(X_BT)
+  #   print(X_BTtch.shape, X_BTpg.shape)
+  #   X_BTEtch, X_BTEpg = C_VEtch[X_BTtch], C_VEpg[X_BTpg]
+  #   np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)
+
+  # permute
+  # reshape
+
 
 # class TestNNOps(unittest.TestCase):
     # def test_cross_entropy(self):
