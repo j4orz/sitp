@@ -1,5 +1,3 @@
-// pub mod optimzer;
-
 use crate::{Device, Dtype, DtypeVal, Layout, ops::Op};
 use pyo3::prelude::*;
 use rand::Rng;

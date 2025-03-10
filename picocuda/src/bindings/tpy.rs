@@ -1,11 +1,24 @@
-use crate::trs::{self, Tensor};
+use crate::ops::cpu_ops::OpForwardError;
+use crate::trs::Tensor;
 use crate::{Device, Dtype, Layout};
 use numpy::{IntoPyArray, PyArrayMethods};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyTuple};
-use std::{
-    iter,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::ops::{Add, Div, Mul, Sub};
+
+// forward---
+// 1. error mapping
+// 2. indexing on trs (TEST)
+// 3. view on trs (TEST)
+// 4. softmax (TEST)
+// 5. multinomial <--- home free (forward pass)
+
+// backward---
+
+impl From<OpForwardError> for PyErr {
+    fn from(e: OpForwardError) -> Self {
+        PyRuntimeError::new_err(e.to_string())
+    }
+}
 
 #[pymethods]
 impl Tensor {
@@ -47,40 +60,40 @@ impl Tensor {
     }
 
     // TODO: partial indexing return Tensor with one less dim
-    fn __getitem__(&self, I: Tensor) -> PyResult<Self> {
-        let output_shape = I
-            .shape
-            .iter()
-            .chain(self.shape.iter().skip(1)) // collapse the first dim of self via indexing
-            .copied()
-            .collect::<Vec<_>>();
-        let output = trs::zeros(output_shape, Dtype::Float32);
+    // fn __getitem__(&self, I: Tensor) -> PyResult<Self> {
+    //     let output_shape = I
+    //         .shape
+    //         .iter()
+    //         .chain(self.shape.iter().skip(1)) // collapse the first dim of self via indexing
+    //         .copied()
+    //         .collect::<Vec<_>>();
+    //     let output = trs::zeros(output_shape, Dtype::Float32);
 
-        {
-            let I_storage = I.storage.borrow();
-            let input_storage = self.storage.borrow();
-            let mut output_storage = output.storage.borrow_mut();
+    //     {
+    //         let I_storage = I.storage.borrow();
+    //         let input_storage = self.storage.borrow();
+    //         let mut output_storage = output.storage.borrow_mut();
 
-            for phy_I in 0..I_storage.data.len() {
-                let i = usize::from(I_storage.data[phy_I]);
-                let (l, r) = (self.stride[0] * i, (self.stride[0] * i) + self.stride[0]);
-                let plucked_tensor = &input_storage.data[l..r];
-                // place plucked_tensor (nested ndarray) in output_storage
+    //         for phy_I in 0..I_storage.data.len() {
+    //             let i = usize::from(I_storage.data[phy_I]);
+    //             let (l, r) = (self.stride[0] * i, (self.stride[0] * i) + self.stride[0]);
+    //             let plucked_tensor = &input_storage.data[l..r];
+    //             // place plucked_tensor (nested ndarray) in output_storage
 
-                let log_I = Self::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
-                let log_output = log_I
-                    .iter()
-                    .chain(iter::repeat(&0).take(self.shape.len() - 1)) // input.shape.len()
-                    .copied()
-                    .collect::<Vec<_>>();
+    //             let log_I = Self::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
+    //             let log_output = log_I
+    //                 .iter()
+    //                 .chain(iter::repeat(&0).take(self.shape.len() - 1)) // input.shape.len()
+    //                 .copied()
+    //                 .collect::<Vec<_>>();
 
-                let phys_output = Self::decode(&log_output, &output.shape);
-                output_storage.data[phys_output..phys_output + plucked_tensor.len()]
-                    .copy_from_slice(plucked_tensor);
-            }
-        }
-        Ok(output)
-    }
+    //             let phys_output = Self::decode(&log_output, &output.shape);
+    //             output_storage.data[phys_output..phys_output + plucked_tensor.len()]
+    //                 .copy_from_slice(plucked_tensor);
+    //         }
+    //     }
+    //     Ok(output)
+    // }
 
     #[getter]
     fn ndim(&self) -> usize {
@@ -124,61 +137,45 @@ impl Tensor {
 
     fn __add__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
         if let Ok(val) = other.extract::<f32>() {
-            self.add(val)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.add(val)?)
         } else if let Ok(t2) = other.extract::<Tensor>() {
-            self.add(&t2)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.add(&t2)?)
         } else {
-            Err(PyRuntimeError::new_err(
-                "Expected a Tensor or a float32 scalar.",
-            ))
+            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
         }
     }
 
     fn __sub__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
         if let Ok(val) = other.extract::<f32>() {
-            self.sub(val)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.sub(val)?)
         } else if let Ok(t2) = other.extract::<Tensor>() {
-            self.sub(&t2)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.sub(&t2)?)
         } else {
-            Err(PyRuntimeError::new_err(
-                "Expected a Tensor or a float32 scalar.",
-            ))
+            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
         }
     }
+
     fn __mul__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
         if let Ok(val) = other.extract::<f32>() {
-            self.mul(val)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.mul(val)?)
         } else if let Ok(t2) = other.extract::<Tensor>() {
-            self.mul(&t2)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.mul(&t2)?)
         } else {
-            Err(PyRuntimeError::new_err(
-                "Expected a Tensor or a float32 scalar.",
-            ))
+            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
         }
     }
 
     fn __truediv__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
         if let Ok(val) = other.extract::<f32>() {
-            self.div(val)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.div(val)?)
         } else if let Ok(t2) = other.extract::<Tensor>() {
-            self.div(&t2)
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+            Ok(self.div(&t2)?)
         } else {
-            Err(PyRuntimeError::new_err(
-                "Expected a Tensor or a float32 scalar.",
-            ))
+            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
         }
     }
 
     fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> {
-        self.matmul(other)
-            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+        Ok(self.matmul(other)?)
     }
 }
