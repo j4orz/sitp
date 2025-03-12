@@ -58,14 +58,13 @@ class TestViewOps(unittest.TestCase):
     assrt([(4,3,6,6)], lambda x: x.reshape((12,6,6)))
     assrt([(4,3,6,6)], lambda x: x.reshape((-1,3,6,6)))
     assrt([(4,3,6,6)], lambda x: x.reshape((-1,1,6,6)))
-    assrt([()], lambda x: x.reshape(()))
+    # self.assrt_exception([(3,4)], lambda x: x.reshape((-1,-1,2)), expected=RuntimeError)
+    # self.assrt_exception([(3,4)], lambda x: x.reshape((-1,-1,-1,2)), expected=RuntimeError)
     
-    # assrt([(4,3,6,6)], lambda x: x.reshape((4,3,6,6)), lambda x: x.reshape((None,None,6,6)))
-    # assrt([(1,)], lambda x: x.reshape(()))
-    # assrt([()], lambda x: x.reshape((1,)))
-    # assrt([()], lambda x: x.reshape((1,1,1)))
-    # self.helper_test_exception([(3,4)], lambda x: x.reshape((-1,-1,2)), lambda x: x.reshape((-1,-1,2)), expected=RuntimeError)
-    # self.helper_test_exception([(3,4)], lambda x: x.reshape((-1,-1,-1,2)), lambda x: x.reshape((-1,-1,-1,2)), expected=RuntimeError)
+    assrt([()], lambda x: x.reshape(()))
+    assrt([(1,)], lambda x: x.reshape(()))
+    assrt([()], lambda x: x.reshape((1,)))
+    assrt([()], lambda x: x.reshape((1,1,1)))
 
   def test_permute(self):
     pass
