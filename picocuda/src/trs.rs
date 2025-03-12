@@ -1,7 +1,5 @@
 use crate::{Device, Dtype, DtypeVal, Layout, ops::Op};
 use pyo3::prelude::*;
-use rand::Rng;
-use rand::distr::StandardUniform;
 use std::{
     cell::RefCell,
     cmp::{Ordering, max},
@@ -83,43 +81,6 @@ pub fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
     }
 }
 
-// todo: requires_grad: bool
-#[pyfunction]
-pub fn new(data: Vec<DtypeVal>) -> Tensor {
-    alloc(&vec![data.len()], data)
-}
-
-#[pyfunction]
-pub fn zeros(shape: Vec<usize>, dtype: Dtype) -> Tensor {
-    let n = shape.iter().product();
-    match dtype {
-        Dtype::Float32 => alloc(&shape, vec![DtypeVal::Float32(0.0); n]),
-        _ => todo!(),
-    }
-}
-
-#[pyfunction]
-pub fn ones(shape: Vec<usize>) -> Tensor {
-    let n = shape.iter().product();
-    let data = vec![DtypeVal::Float32(1.0); n];
-    alloc(&shape, data)
-}
-
-#[pyfunction]
-pub fn randn(shape: Vec<usize>) -> Tensor {
-    let n: usize = shape.iter().product::<usize>();
-    let data = (0..n)
-        .map(|_| DtypeVal::Float32(rand::rng().sample(StandardUniform)))
-        .collect::<Vec<_>>();
-
-    alloc(&shape, data)
-}
-
-#[pyfunction]
-pub fn arange(start: f32, end: f32, step: f32) -> Tensor {
-    todo!()
-}
-
 impl Tensor {
     pub fn to(&self, d: &Device) -> Self {
         let foo = match d {
@@ -139,11 +100,25 @@ impl Tensor {
     // ***************************************** VIEWS (no alloc/datamovement) *****************************************
     // *****************************************************************************************************************
 
-    pub fn no_alloc(&self, shape: &[usize]) -> Self {
+    pub fn continuous_view(&self, shape: &[usize]) -> Self {
         Self {
             ndim: shape.len(),
             shape: shape.to_vec(),
             stride: Self::shape_to_stride(shape),
+            input_op: self.input_op.clone(), // Box<_>.clone()?
+            requires_grad: self.requires_grad,
+            storage: self.storage.clone(),
+            device: self.device.clone(),
+            layout: self.layout.clone(),
+            dtype: self.dtype.clone(),
+        }
+    }
+
+    pub fn noncontinuous_view(&self, shape: &[usize], stride: &[usize]) -> Self {
+        Self {
+            ndim: shape.len(),
+            shape: shape.to_vec(),
+            stride: stride.to_vec(),
             input_op: self.input_op.clone(), // Box<_>.clone()?
             requires_grad: self.requires_grad,
             storage: self.storage.clone(),
@@ -193,16 +168,18 @@ impl Tensor {
             }
         }?;
 
-        Ok(self.no_alloc(&new_shape))
+        Ok(self.continuous_view(&new_shape))
     }
 
     pub fn _permute(&self, indices: &[usize]) -> Self {
-        let new_shape = indices
+        let new_shape = indices.iter().map(|&i| self.shape[i]).collect::<Vec<_>>();
+        let new_stride = indices
             .iter()
-            .map(|&old_dim| self.shape[old_dim])
+            .map(|&i| self.stride[self.ndim - 1 - i])
             .collect::<Vec<_>>();
-
-        self.no_alloc(&new_shape)
+        println!("moose {:?}, {:?}", self.shape, self.stride);
+        println!("deer {:?} {:?}", new_shape, new_stride);
+        self.noncontinuous_view(&new_shape, &new_stride)
     }
 
     pub fn transpose(&self) -> Self {
@@ -439,37 +416,37 @@ impl Index<&[usize]> for Tensor {
 // }
 
 // TODO: partial indexing return Tensor with one less dim
-fn __getitem__(s: &Tensor, I: Tensor) -> Tensor {
-    let output_shape = I
-        .shape
-        .iter()
-        .chain(s.shape.iter().skip(1)) // collapse the first dim of self via indexing
-        .copied()
-        .collect::<Vec<_>>();
-    let output = zeros(output_shape, Dtype::Float32);
+// fn __getitem__(s: &Tensor, I: Tensor) -> Tensor {
+//     let output_shape = I
+//         .shape
+//         .iter()
+//         .chain(s.shape.iter().skip(1)) // collapse the first dim of self via indexing
+//         .copied()
+//         .collect::<Vec<_>>();
+//     let output = zeros(output_shape, Dtype::Float32);
 
-    {
-        let I_storage = I.storage.borrow();
-        let input_storage = s.storage.borrow();
-        let mut output_storage = output.storage.borrow_mut();
+//     {
+//         let I_storage = I.storage.borrow();
+//         let input_storage = s.storage.borrow();
+//         let mut output_storage = output.storage.borrow_mut();
 
-        for phy_I in 0..I_storage.data.len() {
-            let i = usize::from(I_storage.data[phy_I]);
-            let (l, r) = (s.stride[0] * i, (s.stride[0] * i) + s.stride[0]);
-            let plucked_tensor = &input_storage.data[l..r];
-            // place plucked_tensor (nested ndarray) in output_storage
+//         for phy_I in 0..I_storage.data.len() {
+//             let i = usize::from(I_storage.data[phy_I]);
+//             let (l, r) = (s.stride[0] * i, (s.stride[0] * i) + s.stride[0]);
+//             let plucked_tensor = &input_storage.data[l..r];
+//             // place plucked_tensor (nested ndarray) in output_storage
 
-            let log_I = Tensor::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
-            let log_output = log_I
-                .iter()
-                .chain(iter::repeat(&0).take(s.shape.len() - 1)) // input.shape.len()
-                .copied()
-                .collect::<Vec<_>>();
+//             let log_I = Tensor::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
+//             let log_output = log_I
+//                 .iter()
+//                 .chain(iter::repeat(&0).take(s.shape.len() - 1)) // input.shape.len()
+//                 .copied()
+//                 .collect::<Vec<_>>();
 
-            let phys_output = Tensor::decode(&log_output, &output.shape);
-            output_storage.data[phys_output..phys_output + plucked_tensor.len()]
-                .copy_from_slice(plucked_tensor);
-        }
-    }
-    output
-}
+//             let phys_output = Tensor::decode(&log_output, &output.shape);
+//             output_storage.data[phys_output..phys_output + plucked_tensor.len()]
+//                 .copy_from_slice(plucked_tensor);
+//         }
+//     }
+//     output
+// }

@@ -2,10 +2,7 @@ pub mod cpu_ops;
 // pub mod cuda_ops;
 // pub mod wgsl_ops;
 
-use crate::{
-    Device, DtypeVal,
-    trs::{self, Tensor},
-};
+use crate::{Device, DtypeVal, tpy, trs::Tensor};
 use cpu_ops::{OpForwardError, forward_cpu};
 // use cuda_ops::forward_cuda;
 use std::{
@@ -95,7 +92,7 @@ impl Add<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn add(self, other: f32) -> Self::Output {
-        let op = Op::Add(self.clone(), trs::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Add(self.clone(), tpy::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }
@@ -114,7 +111,7 @@ impl Sub<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn sub(self, other: f32) -> Self::Output {
-        let op = Op::Sub(self.clone(), trs::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Sub(self.clone(), tpy::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }
@@ -133,7 +130,7 @@ impl Mul<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn mul(self, other: f32) -> Self::Output {
-        let op = Op::Mul(self.clone(), trs::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Mul(self.clone(), tpy::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }
@@ -153,7 +150,7 @@ impl Div<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn div(self, other: f32) -> Self::Output {
-        let op = Op::Div(self.clone(), trs::new(vec![DtypeVal::Float32(other)]));
+        let op = Op::Div(self.clone(), tpy::new(vec![DtypeVal::Float32(other)]));
         let output = self.forward(&op);
         output
     }

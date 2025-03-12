@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use crate::{
     DtypeVal,
     ops::Op,
+    tpy,
     trs::{self, Tensor},
 };
 
@@ -27,7 +28,7 @@ impl Tensor {
     // reversemode/forwardmode is same for \mathbb{R} because of associativity
     // but with \mahtbb{R^{nxm}} you have to make sure matrices are associative
     pub fn backward(&mut self) -> () {
-        self.storage.borrow_mut().grad = Some(trs::ones(self.shape.clone())); // base case dfdx. // clone because of python/rust memory mismatch
+        self.storage.borrow_mut().grad = Some(tpy::ones(self.shape.clone())); // base case dfdx. // clone because of python/rust memory mismatch
         let (mut topo, mut visited) = (Vec::new(), HashSet::new());
         self.topo(&mut topo, &mut visited);
 
@@ -77,8 +78,8 @@ impl Op {
             Op::Add(_x, _y) => {
                 // d/dx(x + y) = 1, d/dy(x + y) = 1
                 let (dx, dy) = (
-                    trs::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
-                    trs::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    tpy::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    tpy::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
                 );
                 vec![
                     (&dx * &grad.clone()).unwrap(),
@@ -88,8 +89,8 @@ impl Op {
             Op::Sub(_x, _y) => {
                 // d/dx(x - y) = 1, d/dy(x - y) = -1
                 let (dx, dy) = (
-                    trs::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
-                    trs::new(vec![DtypeVal::Float32(-1.0); grad.numel()]),
+                    tpy::ones(grad.shape.clone()), // clone because of python/rust memory mismatch
+                    tpy::new(vec![DtypeVal::Float32(-1.0); grad.numel()]),
                 );
                 vec![
                     (&dx * &grad.clone()).unwrap(),
