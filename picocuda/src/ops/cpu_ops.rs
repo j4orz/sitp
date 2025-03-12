@@ -1,7 +1,7 @@
 use crate::{
     Dtype, DtypeVal,
     ops::Op,
-    trs::{self, Storage, Tensor, TensorError},
+    trs::{self, Storage, Tensor, ViewOpError},
 };
 use std::{
     cell::RefCell,
@@ -83,7 +83,7 @@ impl Neg for DtypeVal {
 #[derive(Error, Debug)]
 pub enum OpForwardError {
     #[error(transparent)]
-    TensorError(#[from] TensorError),
+    TensorError(#[from] ViewOpError),
     #[error("unknown operation error")]
     Unknown,
 }

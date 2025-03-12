@@ -51,15 +51,16 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
   #   np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)
 
 class TestViewOps(unittest.TestCase):
-  def test_view(self):
-    assrt([(3,3)], lambda x: torch.tanh(x), lambda x: picograd.tanh(x))
+#   def test_view(self):
+#     assrt([(4,3,6,6)], lambda x: x.view((12,6,6)))
 
   def test_reshape(self):
     assrt([(4,3,6,6)], lambda x: x.reshape((12,6,6)))
-    # assrt([(4,3,6,6)], lambda x: x.reshape((-1,3,6,6)))
-    # assrt([(4,3,6,6)], lambda x: x.reshape((-1,1,6,6)))
+    assrt([(4,3,6,6)], lambda x: x.reshape((-1,3,6,6)))
+    assrt([(4,3,6,6)], lambda x: x.reshape((-1,1,6,6)))
+    assrt([()], lambda x: x.reshape(()))
+    
     # assrt([(4,3,6,6)], lambda x: x.reshape((4,3,6,6)), lambda x: x.reshape((None,None,6,6)))
-    # assrt([()], lambda x: x.reshape(()))
     # assrt([(1,)], lambda x: x.reshape(()))
     # assrt([()], lambda x: x.reshape((1,)))
     # assrt([()], lambda x: x.reshape((1,1,1)))

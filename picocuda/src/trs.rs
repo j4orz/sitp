@@ -4,7 +4,7 @@ use rand::Rng;
 use rand::distr::StandardUniform;
 use std::{
     cell::RefCell,
-    cmp::max,
+    cmp::{Ordering, max},
     fmt::{self, Display},
     io, iter,
     ops::Index,
@@ -157,21 +157,47 @@ impl Tensor {
         todo!()
     }
 
-    pub fn _reshape(&self, shape: &[usize]) -> Result<Self, io::Error> {
-        let new_size = shape.iter().product::<usize>();
+    pub fn _reshape(&self, new_shape: &[i32]) -> Result<Self, ViewOpError> {
+        let old_size = self.shape.iter().product::<usize>();
+        let negone_count = new_shape.iter().filter(|&&x| x == -1).count();
 
-        if self.numel() != new_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "new shape must have same number of elements as current shape",
-            ));
-        }
+        let new_shape = match negone_count.cmp(&1) {
+            Ordering::Greater => Err(ViewOpError::InvalidReshapeInput),
+            Ordering::Less => Ok(new_shape
+                .iter()
+                .map(|&x| usize::try_from(x).map_err(|_| ViewOpError::InvalidReshapeInput))
+                .collect::<Result<Vec<_>, _>>()?),
+            Ordering::Equal => {
+                let rest_shape = new_shape
+                    .iter()
+                    .filter(|&&x| x != -1)
+                    .map(|&x| usize::try_from(x).map_err(|_| ViewOpError::InvalidReshapeInput))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let rest_shape_size = rest_shape.iter().product::<usize>();
 
-        Ok(self.no_alloc(shape))
+                if old_size % rest_shape_size != 0 {
+                    Err(ViewOpError::ShapeMismatch)
+                } else {
+                    let inferred_dim = old_size / rest_shape_size;
+                    Ok(new_shape
+                        .iter()
+                        .map(|&x| {
+                            if x == -1 {
+                                Ok(inferred_dim)
+                            } else {
+                                usize::try_from(x).map_err(|_| ViewOpError::InvalidReshapeInput)
+                            }
+                        })
+                        .collect::<Result<Vec<_>, _>>()?)
+                }
+            }
+        }?;
+
+        Ok(self.no_alloc(&new_shape))
     }
 
-    pub fn permute(&self, shape: &[usize]) -> Self {
-        let new_shape = shape
+    pub fn _permute(&self, indices: &[usize]) -> Self {
+        let new_shape = indices
             .iter()
             .map(|&old_dim| self.shape[old_dim])
             .collect::<Vec<_>>();
@@ -313,7 +339,7 @@ impl Tensor {
     pub fn broadcast_shape(
         shape_x: &[usize],
         shape_y: &[usize],
-    ) -> Result<Vec<usize>, TensorError> {
+    ) -> Result<Vec<usize>, ViewOpError> {
         let max_len = max(shape_x.len(), shape_y.len());
         let shape_x = iter::repeat(1)
             .take(max_len - shape_x.len())
@@ -331,9 +357,9 @@ impl Tensor {
                 (x, y) if x == y => Ok(x),
                 (1, y) => Ok(y),
                 (x, 1) => Ok(x),
-                _ => Err(TensorError::BroadcastMismatch),
+                _ => Err(ViewOpError::BroadcastMismatch),
             })
-            .collect::<Result<Vec<usize>, TensorError>>();
+            .collect::<Result<Vec<usize>, ViewOpError>>();
 
         output
     }
@@ -361,7 +387,7 @@ impl Tensor {
         output
     }
 
-    pub fn broadcast_logidx(log_x: &[usize], log_y: &[usize]) -> Result<Vec<usize>, TensorError> {
+    pub fn broadcast_logidx(log_x: &[usize], log_y: &[usize]) -> Result<Vec<usize>, ViewOpError> {
         let max_len = max(log_x.len(), log_y.len());
         let padded_x = iter::repeat(0)
             .take(max_len - log_x.len())
@@ -376,18 +402,22 @@ impl Tensor {
                 (x, y) if x == y => Ok(x),
                 (0, y) => Ok(y),
                 (x, 0) => Ok(x),
-                _ => Err(TensorError::BroadcastMismatch),
+                _ => Err(ViewOpError::BroadcastMismatch),
             })
-            .collect::<Result<Vec<usize>, TensorError>>();
+            .collect::<Result<Vec<usize>, ViewOpError>>();
 
         output
     }
 }
 
 #[derive(Error, Debug)]
-pub enum TensorError {
+pub enum ViewOpError {
     #[error("broadcast mismatch")]
     BroadcastMismatch,
+    #[error("shape mismatch")]
+    ShapeMismatch,
+    #[error("invalid reshape input")]
+    InvalidReshapeInput,
     #[error("unknown tensor error")]
     Unknown,
 }

@@ -1,5 +1,5 @@
 use crate::ops::cpu_ops::OpForwardError;
-use crate::trs::Tensor;
+use crate::trs::{Tensor, ViewOpError};
 use crate::{Device, Dtype, Layout};
 use numpy::{IntoPyArray, PyArrayMethods};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyTuple};
@@ -15,6 +15,12 @@ use std::ops::{Add, Div, Mul, Sub};
 
 impl From<OpForwardError> for PyErr {
     fn from(e: OpForwardError) -> Self {
+        PyRuntimeError::new_err(e.to_string())
+    }
+}
+
+impl From<ViewOpError> for PyErr {
+    fn from(e: ViewOpError) -> Self {
         PyRuntimeError::new_err(e.to_string())
     }
 }
@@ -104,8 +110,13 @@ impl Tensor {
 
     // VIEW OPS
     fn reshape(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
-        let shape = shape.extract::<Vec<usize>>()?;
+        let shape = shape.extract::<Vec<i32>>()?;
         Ok(self._reshape(&shape)?)
+    }
+
+    fn permute(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
+        let shape = shape.extract::<Vec<usize>>()?;
+        Ok(self._permute(&shape))
     }
 
     // POINTWISE OPS
