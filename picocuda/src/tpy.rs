@@ -61,7 +61,7 @@ pub fn randn(shape: Vec<usize>) -> Tensor {
 
 #[pyfunction]
 pub fn arange(start: usize, end: usize) -> Tensor {
-    let shape = vec![];
+    let shape = vec![end - start];
     let data = (start..end)
         .map(|x| DtypeVal::Int32(x.try_into().unwrap()))
         .collect::<Vec<_>>();
