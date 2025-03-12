@@ -8,7 +8,7 @@ use numpy::{PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList};
 
 #[pyfunction]
-fn bla<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
+pub fn tensor<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
     fn alloc_from_np<T: numpy::Element, 'py>(
         np: &Bound<'py, numpy::PyArrayDyn<T>>,
     ) -> PyResult<Tensor>
@@ -93,7 +93,7 @@ fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     // m.add_class::<Tensor>()?;
 
     // constructors
-    // pg_m.add_function(wrap_pyfunction!(tensor::tensor, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(tensor, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(trs::zeros, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(trs::ones, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(trs::randn, pg_m)?)?;

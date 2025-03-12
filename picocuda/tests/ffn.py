@@ -71,9 +71,9 @@ model = [
 ]
 
 C_VE = picograd.randn((V,E)) #, generator=g)
-params = [C_VE] + [p for l in model for p in l.parameters()]
-for p in params:
-    p.requires_grad = True
+# params = [C_VE] + [p for l in model for p in l.parameters()]
+# for p in params:
+#     p.requires_grad = True
 
 print("model loaded to cpu")
 
@@ -155,9 +155,9 @@ print(X_NT.shape, Y_N.shape)
 for _ in range(20): # 20 samples
   output, context = [], [0] * T
   while True:
-    X_1T = picograd.tensor([context]) # B=1 for inference, T=3, in [0..27] (clamped to 0 for init))
+    X_1T = picograd.tensor([context]) # B=1 for inference, T=3, in [0..27] (set to 0 for init))
     X_1TE = C_VE[X_1T] # using 0..27 as indices into C_VE for each B=1 example of context length T
-    print(X_1TE.shape)
+    print("moose", X_1TE.shape)
     print(X_1TE)
     X_1cTE = X_1TE.view(-1, T*E) # B=1, TE
     X = X_1cTE

@@ -102,6 +102,13 @@ impl Tensor {
         self.dtype.clone()
     }
 
+    // VIEW OPS
+    fn reshape(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
+        let shape = shape.extract::<Vec<usize>>()?;
+        Ok(self._reshape(&shape)?)
+    }
+
+    // POINTWISE OPS
     fn __add__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
         if let Ok(val) = other.extract::<f32>() {
             Ok(self.add(val)?)
@@ -142,6 +149,7 @@ impl Tensor {
         }
     }
 
+    // PROCESSING OPS
     fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> {
         Ok(self.matmul(other)?)
     }

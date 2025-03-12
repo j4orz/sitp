@@ -30,11 +30,10 @@ pub struct Tensor {
     pub requires_grad: bool,
 
     // physical
-    pub storage: Rc<RefCell<Storage<DtypeVal>>>,
-    // pub storage: Arc<RwLock<Storage<DtypeVal>>>,
+    pub storage: Rc<RefCell<Storage<DtypeVal>>>, // pub storage: Arc<RwLock<Storage<DtypeVal>>>,
     pub device: Device,
     pub layout: Layout,
-    pub dtype: Dtype, // TODO? not typed with storage
+    pub dtype: Dtype, // not typed with storage
 }
 
 impl Clone for Tensor {
@@ -158,7 +157,7 @@ impl Tensor {
         todo!()
     }
 
-    pub fn reshape(&self, shape: &[usize]) -> Result<Self, io::Error> {
+    pub fn _reshape(&self, shape: &[usize]) -> Result<Self, io::Error> {
         let new_size = shape.iter().product::<usize>();
 
         if self.numel() != new_size {
