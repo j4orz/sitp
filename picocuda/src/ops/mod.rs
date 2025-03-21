@@ -83,8 +83,12 @@ impl Add for &Tensor {
 
     fn add(self, input_other: &Tensor) -> Self::Output {
         let op = Op::Add(self.clone(), input_other.clone());
-        let output = self.forward(&op);
-        output
+        let mut output = self.forward(&op)?;
+        output.backward = Box::new(move |grad, input_self, input_other| {
+            input_self.storage.borrow_mut().grad = Some(grad.clone());
+            input_other.storage.borrow_mut().grad = Some(grad.clone());
+        }); // TODO: unwrap?
+        Ok(output)
     }
 }
 
@@ -97,6 +101,7 @@ impl Add<f32> for &Tensor {
         output
     }
 }
+
 impl Sub for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
@@ -131,8 +136,12 @@ impl Mul<f32> for &Tensor {
 
     fn mul(self, other: f32) -> Self::Output {
         let op = Op::Mul(self.clone(), tpy::new(vec![DtypeVal::Float32(other)]));
-        let output = self.forward(&op);
-        output
+        let mut output = self.forward(&op)?;
+        output.backward = Box::new(move |grad, input_self, input_other| {
+            input_self.storage.borrow_mut().grad = Some((grad * &input_other.clone()).unwrap());
+            input_other.storage.borrow_mut().grad = Some((grad * &input_self.clone()).unwrap());
+        }); // TODO: unwrap?
+        Ok(output)
     }
 }
 

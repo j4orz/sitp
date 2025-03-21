@@ -26,6 +26,7 @@ pub struct Tensor {
     pub stride: Vec<usize>,
     pub input_op: Option<Box<Op>>, // need indirection since Op owns a Tensor
     pub requires_grad: bool,
+    pub backward: Box<dyn Fn(&Tensor, &mut Tensor, &mut Tensor) -> ()>,
 
     // physical
     pub storage: Rc<RefCell<Storage<DtypeVal>>>, // pub storage: Arc<RwLock<Storage<DtypeVal>>>,
@@ -173,10 +174,7 @@ impl Tensor {
 
     pub fn _permute(&self, indices: &[usize]) -> Self {
         let new_shape = indices.iter().map(|&i| self.shape[i]).collect::<Vec<_>>();
-        let new_stride = indices
-            .iter()
-            .map(|&i| self.stride[self.ndim - 1 - i])
-            .collect::<Vec<_>>();
+        let new_stride = indices.iter().map(|&i| self.stride[i]).collect::<Vec<_>>();
         println!("moose {:?}, {:?}", self.shape, self.stride);
         println!("deer {:?} {:?}", new_shape, new_stride);
         self.noncontinuous_view(&new_shape, &new_stride)
