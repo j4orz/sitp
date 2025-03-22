@@ -1,18 +1,21 @@
 pub mod cpu_ops;
+pub mod dfdx;
 // pub mod cuda_ops;
-// pub mod wgsl_ops;
 
-use crate::{Device, DtypeVal, tpy, trs::Tensor};
+use crate::{
+    Device, DtypeVal,
+    tpy::{self, ones},
+    trs::Tensor,
+};
 use cpu_ops::{OpForwardError, forward_cpu};
 // use cuda_ops::forward_cuda;
 use std::{
-    hash,
+    collections::HashSet,
     ops::{Add, Div, Mul, Neg, Sub},
 };
-// use wgsl_ops::forward_wgsl;
 
 #[rustfmt::skip]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Op {
     Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binops (zip)
     Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // uops (map)
@@ -43,20 +46,6 @@ impl Op {
     }
 }
 
-impl PartialEq for Op {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self, other) // reference comparison instead of value since f32 is not Eq.
-    }
-}
-
-impl Eq for Op {}
-
-impl hash::Hash for Op {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        (self as *const Self).hash(state);
-    }
-}
-
 impl Tensor {
     fn forward(&self, op: &Op) -> Result<Tensor, OpForwardError> {
         match self.device {
@@ -65,6 +54,55 @@ impl Tensor {
             // Device::Cuda => forward_cuda(op),
             _ => todo!(),
         }
+    }
+
+    pub fn backward(&self) -> () {
+        self.storage.borrow_mut().grad = Some(ones(self.shape.clone()));
+        for tensor in self.topo().iter().rev() {
+            tensor._backward();
+        }
+    }
+
+    fn _backward(&self) -> () {
+        if self.input_op.is_none() {
+            return;
+        }
+
+        let op = self.input_op.as_ref().unwrap();
+        let grads = op.backward(self.storage.borrow().grad.as_ref().unwrap());
+
+        // assuming grads.len() == op.inputs().len()
+        for (input, dfdx_next) in op.inputs().into_iter().zip(grads.iter()) {
+            let mut storage = input.storage.borrow_mut();
+            match storage.grad {
+                Some(ref mut dfdx_prev) => {
+                    *dfdx_prev = (&*dfdx_prev + dfdx_next).unwrap();
+                }
+                None => {
+                    storage.grad = Some(dfdx_next.clone());
+                }
+            }
+        }
+    }
+
+    fn topo(&self) -> Vec<Tensor> {
+        let (mut output, mut seen) = (Vec::new(), HashSet::new());
+        Self::_topo(self, &mut output, &mut seen);
+        output
+    }
+
+    fn _topo(tensor: &Tensor, output: &mut Vec<Tensor>, seen: &mut HashSet<Tensor>) {
+        if seen.contains(&tensor) {
+            return;
+        }
+
+        seen.insert(tensor.clone());
+        if let Some(ref op) = tensor.input_op {
+            for input in op.inputs() {
+                Self::_topo(input, output, seen);
+            }
+        }
+        output.push(tensor.clone());
     }
 }
 
@@ -83,12 +121,8 @@ impl Add for &Tensor {
 
     fn add(self, input_other: &Tensor) -> Self::Output {
         let op = Op::Add(self.clone(), input_other.clone());
-        let mut output = self.forward(&op)?;
-        output.backward = Box::new(move |grad, input_self, input_other| {
-            input_self.storage.borrow_mut().grad = Some(grad.clone());
-            input_other.storage.borrow_mut().grad = Some(grad.clone());
-        }); // TODO: unwrap?
-        Ok(output)
+        let output = self.forward(&op);
+        output
     }
 }
 
@@ -136,12 +170,8 @@ impl Mul<f32> for &Tensor {
 
     fn mul(self, other: f32) -> Self::Output {
         let op = Op::Mul(self.clone(), tpy::new(vec![DtypeVal::Float32(other)]));
-        let mut output = self.forward(&op)?;
-        output.backward = Box::new(move |grad, input_self, input_other| {
-            input_self.storage.borrow_mut().grad = Some((grad * &input_other.clone()).unwrap());
-            input_other.storage.borrow_mut().grad = Some((grad * &input_self.clone()).unwrap());
-        }); // TODO: unwrap?
-        Ok(output)
+        let output = self.forward(&op);
+        output
     }
 }
 

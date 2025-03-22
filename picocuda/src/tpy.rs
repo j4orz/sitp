@@ -1,19 +1,16 @@
-use crate::ops::cpu_ops::OpForwardError;
-use crate::trs::{self, Tensor, ViewOpError};
-use crate::{Device, Dtype, DtypeVal, Layout, nn};
-use numpy::{IntoPyArray, PyArrayMethods, PyUntypedArrayMethods};
+use crate::{
+    ops::cpu_ops::OpForwardError,
+    trs::{self, Tensor, ViewOpError},
+    {Device, Dtype, DtypeVal, Layout, nn},
+};
+use numpy::{PY_ARRAY_API, PyArrayMethods, PyUntypedArrayMethods, dtype, npyffi};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList, types::PyTuple};
-use rand::Rng;
-use rand::distr::StandardUniform;
-use std::ops::{Add, Div, Mul, Sub};
-
-// forward---
-// 2. indexing on trs (TEST)
-// 3. view on trs (TEST)
-// 4. softmax (TEST)
-// 5. multinomial <--- home free (forward pass)
-
-// backward---
+use rand::{Rng, distr::StandardUniform};
+use std::{
+    ops::{Add, Div, Mul, Sub},
+    os::raw::{c_int, c_void},
+    ptr,
+};
 
 impl From<OpForwardError> for PyErr {
     fn from(e: OpForwardError) -> Self {
@@ -72,7 +69,6 @@ pub fn arange(start: usize, end: usize) -> Tensor {
 #[pymethods]
 impl Tensor {
     fn numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, numpy::PyArrayDyn<f32>>> {
-        // todo: why does pytorch need to detatch first?
         let data = self
             .storage
             .borrow()
@@ -81,9 +77,34 @@ impl Tensor {
             .map(|&x| x.into())
             .collect::<Vec<f32>>();
 
-        let np_flat = data.into_pyarray(py).to_dyn().to_owned();
-        let np_shaped = np_flat.reshape(self.shape.clone())?;
-        Ok(np_shaped)
+        let dims_ptr = self.shape.as_slice().as_ptr();
+        let strides_ptr = self.stride.as_slice().as_ptr();
+        let data_ptr = self.storage.borrow().data.as_slice().as_ptr();
+        let foo = unsafe {
+            pyo3::Python::with_gil(|py| {
+                let ptr = PY_ARRAY_API.PyArray_NewFromDescr(
+                    py,
+                    PY_ARRAY_API.get_type_object(py, npyffi::NpyTypes::PyArray_Type),
+                    dtype::<f32>(py), // T::get_dtype(py).into_dtype_ptr(),
+                    self.ndim as c_int,
+                    dims_ptr as *mut npyffi::npy_intp, // libc isize
+                    strides_ptr as *mut npyffi::npy_intp, // strides
+                    data_ptr as *mut c_void,           // data
+                    npyffi::NPY_ARRAY_WRITEABLE,       // flag
+                    ptr::null_mut(),                   // obj
+                );
+
+                PY_ARRAY_API.PyArray_SetBaseObject(
+                    py,
+                    ptr as *mut npyffi::PyArrayObject,
+                    container as *mut pyo3::ffi::PyObject,
+                );
+
+                Bound::from_owned_ptr(py, ptr).downcast_into_unchecked()
+            })
+        };
+
+        Ok(foo)
     }
 
     pub fn detach(&self) -> Self {

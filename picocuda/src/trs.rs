@@ -4,7 +4,7 @@ use std::{
     cell::RefCell,
     cmp::{Ordering, max},
     fmt::{self, Display},
-    io, iter,
+    hash, iter,
     ops::Index,
     rc::Rc,
 };
@@ -18,7 +18,6 @@ use thiserror::Error;
 //   - UnsafeCell<_>: efficient
 
 #[pyclass(unsendable)] // for now. does pytorch user code multithread tensors?
-#[derive(Debug)]
 pub struct Tensor {
     // logical
     pub ndim: usize,
@@ -26,7 +25,6 @@ pub struct Tensor {
     pub stride: Vec<usize>,
     pub input_op: Option<Box<Op>>, // need indirection since Op owns a Tensor
     pub requires_grad: bool,
-    pub backward: Box<dyn Fn(&Tensor, &mut Tensor, &mut Tensor) -> ()>,
 
     // physical
     pub storage: Rc<RefCell<Storage<DtypeVal>>>, // pub storage: Arc<RwLock<Storage<DtypeVal>>>,
@@ -42,8 +40,8 @@ impl Clone for Tensor {
             shape: self.shape.clone(),
             stride: self.stride.clone(),
             input_op: self.input_op.clone(),
-            requires_grad: self.requires_grad,
-            storage: self.storage.clone(), // Rc::clone()
+            requires_grad: self.requires_grad, // TODO: detach?
+            storage: self.storage.clone(),     // Rc::clone()
             device: self.device.clone(),
             layout: self.layout.clone(),
             dtype: self.dtype.clone(),
@@ -51,7 +49,21 @@ impl Clone for Tensor {
     }
 }
 
-#[derive(Clone, Debug)]
+impl PartialEq for Tensor {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other) // reference comparison instead of value since f32 is not Eq.
+    }
+}
+
+impl Eq for Tensor {}
+
+impl hash::Hash for Tensor {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        (self as *const Self).hash(state);
+    }
+}
+
+#[derive(Clone)]
 pub struct Storage<DtypeVal> {
     pub data: Vec<DtypeVal>, // picograd fixed on fp32 to bootstrap
     pub grad: Option<Tensor>,

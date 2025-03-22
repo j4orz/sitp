@@ -1,5 +1,4 @@
 // frontend
-pub mod dfdx;
 pub mod nn;
 pub mod storage;
 pub mod tpy;
