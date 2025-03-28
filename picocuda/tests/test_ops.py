@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import torch
 import picograd
+import os
 
 # see: https://pytorch.org/docs/stable/notes/numerical_accuracy.html
 
@@ -9,7 +10,9 @@ import picograd
 def assrt(input_shapes, f_tch, f_pg=None, l=-2, h=2, atol=1e-6, rtol=1e-3, grad_atol=1e-4, grad_rtol=1e-3, rg=False):
   if f_pg is None: f_pg = f_tch
   xtch, xpg = gen_inputs(input_shapes, l, h, rg)
+  print("x:", xtch)
   ytch, ypg = f_tch(*xtch), f_pg(*xpg)
+  print("y shape/stride", ytch.shape, ytch.stride())
   verify_outputs("forward pass", ytch.detach().numpy(), ypg.detach().numpy(), atol=atol, rtol=rtol)
   # compare(f"backward pass tensor {i}", tt_grad.numpy(), t.grad.detach().numpy(), atol=grad_atol, rtol=grad_rtol)
 
@@ -22,11 +25,16 @@ def gen_inputs(input_shapes, l, h, rg=False):
     if xtch[i].dtype == torch.int64: xtch[i] = xtch[i].type(torch.int32) # NOTE: torch default int64 for python ints input
       
   # 2. x_pg
-  xpg = [picograd.tensor(x.detach().numpy()) for x in xtch] # TODO: support rerquires_grad
+  xpg = [picograd.tensor(x.detach().numpy()) for x in xtch] # TODO: support requires_grad
   return xtch, xpg
 
+def getenv(key:str, default=0): return type(default)(os.getenv(key, default))
+PRINT_TENSORS = getenv("PRINT_TENSORS", 0)
+
 def verify_outputs(s, ytch, ypg, atol, rtol):
-    # if PRINT_TENSORS: print(s, xtch, x_pico)
+    if PRINT_TENSORS:
+      print("expected (torch)", ytch)
+      print("actual (pico)", ypg)
     try:
       assert ytch.shape == ypg.shape, f"shape mismatch: expected={ytch.shape} | actual={ypg.shape}"
       assert ytch.dtype == ypg.dtype, f"dtype mismatch: expected={ytch.dtype} | actual={ypg.dtype}"
@@ -39,21 +47,7 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
       raise AssertionError(f"{s} failed (shape={ytch.shape}) - {str(e)}") from None
 
 # ********************************************* TESTS **********************************************
-
-# def test_getitem_tensorindex(self):
-  #   B, T, V, E = 32, 3, 27, 10 # embedding for character language model
-  #   C_VEtch, C_VEpg = torch.randn((V, E)), picograd.randn((V, E))
-
-  #   X_BT = np.random.randint(0, V, (B, T))
-  #   X_BTtch, X_BTpg = torch.tensor(X_BT), picograd.tensor(X_BT)
-  #   print(X_BTtch.shape, X_BTpg.shape)
-  #   X_BTEtch, X_BTEpg = C_VEtch[X_BTtch], C_VEpg[X_BTpg]
-  #   np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)
-
 class TestViewOps(unittest.TestCase):
-#   def test_view(self):
-#     assrt([(4,3,6,6)], lambda x: x.view((12,6,6)))
-
   def test_reshape(self):
     assrt([(4,3,6,6)], lambda x: x.reshape((12,6,6)))
     assrt([(4,3,6,6)], lambda x: x.reshape((-1,3,6,6)))
@@ -67,13 +61,29 @@ class TestViewOps(unittest.TestCase):
     assrt([()], lambda x: x.reshape((1,1,1)))
 
   def test_permute(self):
-    pass
+    assrt([(4,3)], lambda x: x.permute((1,0)))
+    # assrt([(4,3)], lambda x: x.permute((0,1)))
+    # assrt([(1,2,3,4)], lambda x: x.permute((3,0,2,1)))
+    # assrt([(3,4,5,6)], lambda x: x.permute((3,2,1,0)))
+    # assrt([(3,4,5,6)], lambda x: x.permute((-2,-1,1,0)))
+    # assrt([()], lambda x: x.permute(()))
+    # self.assrt_exception([(3,4,5,6)], lambda x: x.permute((0,2)), lambda x: x.permute((0,2)), expected=RuntimeError)
+    # self.assrt_exception([(3,4,5,6)], lambda x: x.permute((0,1,2,3,3,3)), lambda x: x.permute((0,1,2,3,3,3)), expected=RuntimeError)
+    # self.assrt_exception([(3,4,5,6)], lambda x: x.permute((0,0,1,2,3)), lambda x: x.permute((0,0,1,2,3)), expected=RuntimeError)
 
   def test_transpose(self):
     pass
 
-  def test_getitem(self):
-    pass
+  def test_getitem_tensor(self):
+    B, T, V, E = 32, 3, 27, 10
+    C_VEtch, C_VEpg = gen_inputs([(V, E)], -2, 2, rg=False)
+    C_VEtch, C_VEpg = C_VEtch[0], C_VEpg[0]
+    
+    X_BTnp = np.random.randint(0, V, (B, T))
+    X_BTtch, X_BTpg = torch.tensor(X_BTnp), picograd.tensor(X_BTnp)
+    X_BTEtch, X_BTEpg = C_VEtch[X_BTtch], C_VEpg[X_BTpg]
+
+    np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)
 
   def test_gather(self):
     pass
@@ -197,8 +207,8 @@ class TestProcessingOps(unittest.TestCase):
   # def test_maxpool2d(self):
   #   pass
 
-  def test_topk(self):
-    pass
+#   def test_topk(self):
+#     pass
 
 class TestNetworkOps(unittest.TestCase):
   def test_linear(self):
@@ -219,13 +229,8 @@ class TestNetworkOps(unittest.TestCase):
   def test_nllloss(self):
     pass  
 
-
-# class TestNNOps(unittest.TestCase):
-    # def test_cross_entropy(self):
-    #     assrt([(3), (3)], lambda p,q: torch.nn.functional.cross_entropy(p, q), lambda p,q: picograd.nn.functional.cross_entropy(p, q))
-
-    # def test_softmax(self):
-    #     assrt([(3), (3)], lambda x: torch.nn.functional.softmax(x, dim=1), lambda x: picograd.nn.functional.softmax(x, 1))
+# def test_softmax(self):
+#     assrt([(3), (3)], lambda x: torch.nn.functional.softmax(x, dim=1), lambda x: picograd.nn.functional.softmax(x, 1))
 
 if __name__ == '__main__':
   np.random.seed(1337)

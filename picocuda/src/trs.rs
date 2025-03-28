@@ -9,25 +9,16 @@ use std::{
     rc::Rc,
 };
 use thiserror::Error;
-// - lifetime: deallocation semantics
-//   - Box<_>: N/A (exclusive ownership)
-//   - Rc<_>: reference counting
-//   - arena:
-// - mutation: needed for .backward()
-//   - RefCell<_>: safe
-//   - UnsafeCell<_>: efficient
 
 #[pyclass(unsendable)] // for now. does pytorch user code multithread tensors?
 pub struct Tensor {
-    // logical
     pub ndim: usize,
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
-    pub input_op: Option<Box<Op>>, // need indirection since Op owns a Tensor
+    pub input_op: Option<Box<Op>>, // indirection for sized (Op owns a Tensor)
     pub requires_grad: bool,
 
-    // physical
-    pub storage: Rc<RefCell<Storage<DtypeVal>>>, // pub storage: Arc<RwLock<Storage<DtypeVal>>>,
+    pub storage: Rc<RefCell<Storage<DtypeVal>>>, // lifetime: Box<_>/Rc<_>, mutation: RefCell<_>(safe)/UnsafeCell<_>(speed)
     pub device: Device,
     pub layout: Layout,
     pub dtype: Dtype, // not typed with storage
@@ -185,11 +176,35 @@ impl Tensor {
     }
 
     pub fn _permute(&self, indices: &[usize]) -> Self {
-        let new_shape = indices.iter().map(|&i| self.shape[i]).collect::<Vec<_>>();
-        let new_stride = indices.iter().map(|&i| self.stride[i]).collect::<Vec<_>>();
-        println!("moose {:?}, {:?}", self.shape, self.stride);
-        println!("deer {:?} {:?}", new_shape, new_stride);
-        self.noncontinuous_view(&new_shape, &new_stride)
+        todo!()
+    }
+
+    // Z_I1I2...IND2..DN = X_*D1*D2...DN[I_I1I2..IN]
+    // I indexes into X's first dimension
+    // so I ∈ 0..D1 must hold.
+    // e.g C_VE[X_BT] for a character-level language model where |V| = 27 ==> X_BT ∈ 0..26
+    pub fn getitem(&self, I: &Tensor) -> Self {
+        let X = self;
+        let shape_z = I
+            .shape
+            .iter()
+            .chain(X.shape[1..].iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let data_z = vec![DtypeVal::Float32(0.0); shape_z.iter().product()];
+        let z = alloc(&shape_z, data_z);
+
+        for phy in 0..I.storage.borrow().data.len() {
+            let index = usize::from(I.storage.borrow().data[phy]);
+            let plucked_phystart = index * X.stride[0]; // I's index used to index X's first dim
+            let plucked_phyend = plucked_phystart + X.stride[0]; // .numel() in D2*D3*...DN = X.stride[0] = X.shape.iter().skip(1).product();
+            let plucked = &X.storage.borrow().data[plucked_phystart..plucked_phyend];
+            let dst_phystart = phy * plucked.len();
+            let dst_phyend = dst_phystart + plucked.len();
+            z.storage.borrow_mut().data[dst_phystart..dst_phyend].copy_from_slice(plucked);
+        }
+
+        z
     }
 
     pub fn transpose(&self) -> Self {
