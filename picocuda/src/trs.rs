@@ -5,25 +5,40 @@ use std::{
     cmp::{Ordering, max},
     fmt::{self, Display},
     hash, iter,
-    ops::Index,
     rc::Rc,
 };
 use thiserror::Error;
 
-#[pyclass(unsendable)] // for now. does pytorch user code multithread tensors?
+// Tensor: when designing the ndarray abstraction in Rust, there are a few design
+// decisions with respect to the underlying storage:
+//      1. lifetimes Box<_> vs Rc<_>
+//      2. mutation: RefCell<_>(safe) vs UnsafeCell<_>(speed)j
+// NB:
+// - unsendable: does pytorch user code multithread tensors?
+// - dtype not typed with storage
+
+#[pyclass(unsendable)]
 pub struct Tensor {
     pub ndim: usize,
     pub shape: Vec<usize>,
     pub stride: Vec<usize>,
-    pub input_op: Option<Box<Op>>, // indirection for sized (Op owns a Tensor)
+    pub input_op: Option<Box<Op>>,
     pub requires_grad: bool,
 
-    pub storage: Rc<RefCell<Storage<DtypeVal>>>, // lifetime: Box<_>/Rc<_>, mutation: RefCell<_>(safe)/UnsafeCell<_>(speed)
+    pub storage: Rc<RefCell<Storage<DtypeVal>>>,
     pub device: Device,
     pub layout: Layout,
-    pub dtype: Dtype, // not typed with storage
+    pub dtype: Dtype,
 }
 
+// NB: clones are not expensive because they implement view semantics. the
+//     storage.clone() call is a call to Rc::clone() which simply increments
+//     an internal counter. See Niko Matsakis' early thoughts on making these
+//     cheap clones with a "Claim" trait:
+//     - https://smallcultfollowing.com/babysteps/blog/2024/06/21/claim-auto-and-otherwise/
+//     - https://smallcultfollowing.com/babysteps/blog/2024/06/26/claim-followup-1/
+
+// TODO: detach?
 impl Clone for Tensor {
     fn clone(&self) -> Self {
         Self {
@@ -31,8 +46,8 @@ impl Clone for Tensor {
             shape: self.shape.clone(),
             stride: self.stride.clone(),
             input_op: self.input_op.clone(),
-            requires_grad: self.requires_grad, // TODO: detach?
-            storage: self.storage.clone(),     // Rc::clone()
+            requires_grad: self.requires_grad,
+            storage: self.storage.clone(),
             device: self.device.clone(),
             layout: self.layout.clone(),
             dtype: self.dtype.clone(),
@@ -40,9 +55,10 @@ impl Clone for Tensor {
     }
 }
 
+// NB: reference comparison instead of value since f32 is not Eq.
 impl PartialEq for Tensor {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self, other) // reference comparison instead of value since f32 is not Eq.
+        std::ptr::eq(self, other)
     }
 }
 
@@ -56,7 +72,7 @@ impl hash::Hash for Tensor {
 
 #[derive(Clone)]
 pub struct Storage<DtypeVal> {
-    pub data: Vec<DtypeVal>, // picograd fixed on fp32 to bootstrap
+    pub data: Vec<DtypeVal>,
     pub grad: Option<Tensor>,
 }
 
@@ -67,9 +83,21 @@ impl Display for Tensor {
     }
 }
 
-// *****************************************************************************************************************
-// ********************************************* CONSTRUCTORS (alloc) **********************************************
-// *****************************************************************************************************************
+#[derive(Error, Debug)]
+pub enum ViewOpError {
+    #[error("broadcast mismatch")]
+    BroadcastMismatch,
+    #[error("shape mismatch")]
+    ShapeMismatch,
+    #[error("invalid reshape input")]
+    InvalidReshapeInput,
+    #[error("unknown tensor error")]
+    Unknown,
+}
+
+// *****************************************************************************
+// *************************** CONSTRUCTORS (alloc) ***************************
+// *****************************************************************************
 
 pub fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
     Tensor {
@@ -100,9 +128,9 @@ impl Tensor {
         self.shape.iter().product::<usize>()
     }
 
-    // *****************************************************************************************************************
-    // ***************************************** VIEWS (no alloc/datamovement) *****************************************
-    // *****************************************************************************************************************
+    // *************************************************************************
+    // ********************* VIEWS (no alloc/datamovement) *********************
+    // *************************************************************************
 
     pub fn continuous_view(&self, shape: &[usize]) -> Self {
         Self {
@@ -207,46 +235,6 @@ impl Tensor {
         z
     }
 
-    pub fn transpose(&self) -> Self {
-        todo!()
-    }
-
-    pub fn gather(&self) -> Self {
-        todo!()
-    }
-
-    pub fn scatter(&self) -> Self {
-        todo!()
-    }
-
-    pub fn cat(&self) -> Self {
-        todo!()
-    }
-
-    pub fn stack(&self) -> Self {
-        todo!()
-    }
-
-    pub fn squeeze(&self) -> Self {
-        todo!()
-    }
-
-    pub fn unsqueeze(&self) -> Self {
-        todo!()
-    }
-
-    pub fn flatten(&self) -> Self {
-        todo!()
-    }
-
-    pub fn unflatten(&self) -> Self {
-        todo!()
-    }
-
-    pub fn contiguous(&self) -> Self {
-        todo!()
-    }
-
     fn format(
         &self,
         fmt: &mut fmt::Formatter<'_>,
@@ -280,12 +268,12 @@ impl Tensor {
         }
     }
 
-    // *****************************************************************************************************************
-    // ********************************************* INDEXING *********************************************
-    // *****************************************************************************************************************
+    // *************************************************************************
+    // ******************************* INDEXING ********************************
+    // *************************************************************************
 
     // note: best way to think about strides
-    // is to imagine the indices of the nested for loop when unrolling
+    // is to conceptualize the indices of the nested for loop when unrolling
     // e.g: shape: [3, 4, 6] ==> stride: [24, 6, 1]
     //      - one step for outer is 24 physical indices
     //      - one step for middle is 6 physical indices
@@ -308,7 +296,7 @@ impl Tensor {
         stride
     }
 
-    // note: Vec<usize> is used for internal indexing
+    // NB: Vec<usize> is used for internal indexing
     // Vec<DtypeVal=Int32> is used by library crate users
 
     // encode (lifting): phys(usize) -> log(Vec<usize>)
@@ -335,9 +323,9 @@ impl Tensor {
             .fold(0, |acc, (i, s)| acc + i * s)
     }
 
-    // *****************************************************************************************************************
-    // ********************************************* BROADCASTING *********************************************
-    // *****************************************************************************************************************
+    // *************************************************************************
+    // ***************************** BROADCASTING ******************************
+    // *************************************************************************
     pub fn broadcast_shape(
         shape_x: &[usize],
         shape_y: &[usize],
@@ -411,67 +399,3 @@ impl Tensor {
         output
     }
 }
-
-#[derive(Error, Debug)]
-pub enum ViewOpError {
-    #[error("broadcast mismatch")]
-    BroadcastMismatch,
-    #[error("shape mismatch")]
-    ShapeMismatch,
-    #[error("invalid reshape input")]
-    InvalidReshapeInput,
-    #[error("unknown tensor error")]
-    Unknown,
-}
-
-impl Index<&[usize]> for Tensor {
-    type Output = DtypeVal;
-
-    fn index(&self, i: &[usize]) -> &Self::Output {
-        todo!()
-    }
-}
-
-// impl IndexMut<(usize, usize)> for Tensor {
-//     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-//         let (i, j) = index;
-//         let idx = i * self.shape[1] + j; // Row-major ordering
-//         &mut self.data[idx]
-//     }
-// }
-
-// TODO: partial indexing return Tensor with one less dim
-// fn __getitem__(s: &Tensor, I: Tensor) -> Tensor {
-//     let output_shape = I
-//         .shape
-//         .iter()
-//         .chain(s.shape.iter().skip(1)) // collapse the first dim of self via indexing
-//         .copied()
-//         .collect::<Vec<_>>();
-//     let output = zeros(output_shape, Dtype::Float32);
-
-//     {
-//         let I_storage = I.storage.borrow();
-//         let input_storage = s.storage.borrow();
-//         let mut output_storage = output.storage.borrow_mut();
-
-//         for phy_I in 0..I_storage.data.len() {
-//             let i = usize::from(I_storage.data[phy_I]);
-//             let (l, r) = (s.stride[0] * i, (s.stride[0] * i) + s.stride[0]);
-//             let plucked_tensor = &input_storage.data[l..r];
-//             // place plucked_tensor (nested ndarray) in output_storage
-
-//             let log_I = Tensor::encode(phy_I, &I.shape); // where we slot the plucked input in the output tensor
-//             let log_output = log_I
-//                 .iter()
-//                 .chain(iter::repeat(&0).take(s.shape.len() - 1)) // input.shape.len()
-//                 .copied()
-//                 .collect::<Vec<_>>();
-
-//             let phys_output = Tensor::decode(&log_output, &output.shape);
-//             output_storage.data[phys_output..phys_output + plucked_tensor.len()]
-//                 .copy_from_slice(plucked_tensor);
-//         }
-//     }
-//     output
-// }
