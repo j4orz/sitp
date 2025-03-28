@@ -304,6 +304,7 @@ fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     // nn.functional
     let ff_m = PyModule::new(py, "functional")?;
     ff_m.add_function(wrap_pyfunction!(nn::cross_entropy, &ff_m)?)?;
+    ff_m.add_function(wrap_pyfunction!(nn::softmax, &ff_m)?)?;
 
     // nn
     let nn_m = PyModule::new(py, "nn")?;

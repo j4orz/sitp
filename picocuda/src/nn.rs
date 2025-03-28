@@ -25,7 +25,7 @@ pub fn cross_entropy(p: Tensor, q: Tensor) -> PyResult<Tensor> {
 
 #[pyfunction]
 pub fn softmax(x: Tensor, dim: usize) -> PyResult<Tensor> {
-    // softmax(x)_i := exp(xᵢ) / Σⱼ exp(xⱼ)
+    // softmax(x) := exp(xᵢ) / Σⱼ exp(xⱼ)
     let exp = x
         .exp()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
