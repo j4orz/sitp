@@ -3,8 +3,6 @@ use crate::trs::{self, Tensor, ViewOpError};
 use crate::{Device, Dtype, DtypeVal, Layout, nn};
 use numpy::{IntoPyArray, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList, types::PyTuple};
-use rand::Rng;
-use rand::distr::StandardUniform;
 use std::ops::{Add, Div, Mul, Sub};
 
 impl From<OpForwardError> for PyErr {
@@ -43,12 +41,12 @@ pub fn ones(shape: Vec<usize>) -> Tensor {
 
 #[pyfunction]
 pub fn randn(shape: Vec<usize>) -> Tensor {
-    let n: usize = shape.iter().product::<usize>();
-    let data = (0..n)
-        .map(|_| DtypeVal::Float32(rand::rng().sample(StandardUniform)))
-        .collect::<Vec<_>>();
+    Tensor::randn(&shape)
+}
 
-    trs::alloc(&shape, data)
+#[pyfunction]
+pub fn multinomial(dist: &Tensor, num_samples: usize, replacement: bool) -> Tensor {
+    Tensor::multinomial(dist, num_samples, replacement)
 }
 
 #[pyfunction]
@@ -295,18 +293,19 @@ fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     pg_m.add_function(wrap_pyfunction!(randn, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(arange, pg_m)?)?;
 
+    // samplers
+    pg_m.add_function(wrap_pyfunction!(multinomial, pg_m)?)?;
+
     // ops
     pg_m.add_function(wrap_pyfunction!(tanh, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(exp, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(log, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(sum, pg_m)?)?;
 
-    // nn.functional
+    // nn.functional/nn
     let ff_m = PyModule::new(py, "functional")?;
     ff_m.add_function(wrap_pyfunction!(nn::cross_entropy, &ff_m)?)?;
     ff_m.add_function(wrap_pyfunction!(nn::softmax, &ff_m)?)?;
-
-    // nn
     let nn_m = PyModule::new(py, "nn")?;
     nn_m.add_submodule(&ff_m)?;
     pg_m.add_submodule(&nn_m)?;

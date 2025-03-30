@@ -19,9 +19,7 @@ use std::{
 pub enum Op {
     Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binops (zip)
     Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // uops (map)
-    Sum(Tensor, usize, bool), // reduce
-    // Mean(Tensor), Var(Tensor), // statistics
-    // Dot
+    Sum(Tensor, usize, bool), Max(Tensor, usize, bool) // reduce
 }
 
 impl Op {
@@ -42,6 +40,7 @@ impl Op {
                 vec![x]
             }
             Op::Sum(x, _, _) => vec![x],
+            Op::Max(x, _, _) => vec![x]
         }
     }
 }
@@ -242,19 +241,9 @@ impl Tensor {
         output
     }
 
-    // pub fn max(&self, dim: i32, keepdim: bool) -> Result<Tensor, OpForwardError> {
-    //     todo!()
-    // }
-
-    // pub fn min(&self, dim: i32, keepdim: bool) -> Result<Tensor, OpForwardError> {
-    //     todo!()
-    // }
-
-    // pub fn mean(&self, dim: usize) -> Result<Tensor, OpForwardError> {
-    //     todo!()
-    // }
-
-    // pub fn var(&self, dim: usize) -> Result<Tensor, OpForwardError> {
-    //     todo!()
-    // }
+    pub fn max(&self, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
+        let op = Op::Max(self.clone(), dim, keepdim);
+        let output = self.forward(&op);
+        output
+    }
 }

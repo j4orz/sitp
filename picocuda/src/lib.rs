@@ -29,7 +29,7 @@ pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
 #[rustfmt::skip]
 #[derive(FromPyObject)]
 #[derive(IntoPyObject)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
 
 impl From<i32> for DtypeVal {

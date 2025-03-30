@@ -27,10 +27,9 @@ impl Op {
             Op::Sinh(x) => todo!(),
             Op::Cosh(x) => todo!(),
             Op::Tanh(x) => todo!(),
-            // Op::Mean(x) => todo!(),
-            // Op::Var(x) => todo!(),
             Op::Matmul(x, y) => todo!(),
             Op::Sum(tensor, _, _) => todo!(),
+            Op::Max(tensor, _, _) => todo!(),
         }
     }
 }

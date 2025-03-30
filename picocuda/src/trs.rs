@@ -1,5 +1,9 @@
 use crate::{Device, Dtype, DtypeVal, Layout, ops::Op};
 use pyo3::prelude::*;
+use rand::{
+    Rng,
+    distr::{StandardUniform, Uniform},
+};
 use std::{
     cell::RefCell,
     cmp::{Ordering, max},
@@ -9,10 +13,18 @@ use std::{
 };
 use thiserror::Error;
 
-// Tensor: when designing the ndarray abstraction in Rust, there are a few design
-// decisions with respect to the underlying storage:
+// Tensor
+// ------
+// storage: two design decisions
 //      1. lifetimes Box<_> vs Rc<_>
 //      2. mutation: RefCell<_>(safe) vs UnsafeCell<_>(speed)j
+// impl Tensor:
+// - CONSTRUCTORS (alloc): alloc
+// - VIEWS (no alloc): continuous_view, noncontinuous_view, reshape, permute, getitem
+// - INDEXING (internal): shape_to_stride, encode, decode
+// - BROADCASTING: broadcast_shape, clamp_stride, broadcast_logidx
+// - SAMPLING: ran
+
 // NB:
 // - unsendable: does pytorch user code multithread tensors?
 // - dtype not typed with storage
@@ -129,7 +141,7 @@ impl Tensor {
     }
 
     // *************************************************************************
-    // ********************* VIEWS (no alloc/datamovement) *********************
+    // *************************** VIEWS (no alloc) ****************************
     // *************************************************************************
 
     pub fn continuous_view(&self, shape: &[usize]) -> Self {
@@ -397,5 +409,56 @@ impl Tensor {
             .collect::<Result<Vec<usize>, ViewOpError>>();
 
         output
+    }
+
+    // *************************************************************************
+    // ******************************* SAMPLING ********************************
+    // *************************************************************************
+    pub fn randn(shape: &[usize]) -> Tensor {
+        let n: usize = shape.iter().product::<usize>();
+        let data = (0..n)
+            .map(|_| DtypeVal::Float32(rand::rng().sample(StandardUniform)))
+            .collect::<Vec<_>>();
+        alloc(&shape, data)
+    }
+
+    // inverse (smirnov) transform sampling
+    // 1. u ~ U(0, dist.iter().sum())
+    // 2. x <- F⁻¹(u)
+    // see: https://en.wikipedia.org/wiki/Inverse_transform_sampling
+    pub fn multinomial(dist: &Tensor, samples: usize, replacement: bool) -> Tensor {
+        println!("moose {:?}", dist.storage.borrow().data);
+        let dist = &dist
+            .storage
+            .borrow()
+            .data
+            .iter()
+            .map(|d| match d {
+                DtypeVal::Bool(_) => todo!(),
+                DtypeVal::Float32(x) => *x,
+                DtypeVal::Float64(_) => todo!(),
+                DtypeVal::Int16(_) => todo!(),
+                DtypeVal::Int32(_) => todo!(),
+                DtypeVal::Int64(_) => todo!(),
+            })
+            .collect::<Vec<_>>();
+
+        println!("moose {:?}", dist);
+        let total = dist.iter().sum::<f32>();
+        let mut output = Vec::with_capacity(samples);
+        for _ in 0..samples {
+            let u = rand::rng().sample(Uniform::new(0.0, total).unwrap());
+            let (mut cumsum, mut index) = (0.0, 0);
+            for (i, p) in dist.iter().enumerate() {
+                cumsum += p;
+                if cumsum >= u {
+                    index = i;
+                    break; // walk until we hit the border of the area
+                }
+            }
+
+            output.push(DtypeVal::Int32(index as i32)) // TODO: dtypes are messed up
+        }
+        alloc(&vec![samples], output)
     }
 }

@@ -6,80 +6,11 @@ use crate::{
 };
 use std::{
     cell::RefCell,
+    cmp,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub},
     rc::Rc,
 };
 use thiserror::Error;
-
-impl Add for DtypeVal {
-    type Output = DtypeVal;
-
-    fn add(self, other: Self) -> Self::Output {
-        match (self, other) {
-            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x + y),
-            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x + y),
-            _ => todo!(),
-        }
-    }
-}
-
-impl AddAssign for DtypeVal {
-    fn add_assign(&mut self, other: Self) {
-        *self = self.add(other);
-    }
-}
-
-impl Sub for DtypeVal {
-    type Output = DtypeVal;
-
-    fn sub(self, other: Self) -> Self::Output {
-        match (self, other) {
-            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x - y),
-            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x - y),
-            _ => todo!(),
-        }
-    }
-}
-
-impl Mul for DtypeVal {
-    type Output = DtypeVal;
-
-    fn mul(self, other: Self) -> Self::Output {
-        match (self, other) {
-            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x * y),
-            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x * y),
-            _ => todo!(),
-        }
-    }
-}
-
-impl Div for DtypeVal {
-    type Output = DtypeVal;
-
-    fn div(self, other: Self) -> Self::Output {
-        match (self, other) {
-            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x / y),
-            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x / y),
-            _ => todo!(),
-        }
-    }
-}
-
-impl Neg for DtypeVal {
-    type Output = DtypeVal;
-
-    fn neg(self) -> Self::Output {
-        match self {
-            DtypeVal::Float32(x) => DtypeVal::Float32(-x),
-            DtypeVal::Int32(x) => DtypeVal::Int32(-x),
-            _ => todo!(),
-        }
-    }
-}
-
-// *****************************************************************************************************************
-// ******************************************** .forward() *********************************************
-// *****************************************************************************************************************
 
 #[derive(Error, Debug)]
 pub enum OpForwardError {
@@ -95,64 +26,29 @@ pub fn forward_cpu(op: &Op) -> Result<Tensor, OpForwardError> {
         Op::Sub(x, y) => zip_cpu(|xi, yi| xi - yi, x, y),
         Op::Mul(x, y) => zip_cpu(|xi, yi| xi * yi, x, y),
         Op::Div(x, y) => zip_cpu(|xi, yi| xi / yi, x, y),
-        // TODO?: can desugar to mul, just like tanh(x) := div(sinh(x), cosh(x))
-        // let op = Op::Mul(x.clone(), Tensor::new(vec![-1.0; x.numel()]));
-        // let y = forward(&op, &self.device);
-        // y
-
-        // thread op through to maintain compute graph (output.inputs)
         Op::Neg(x) => map_cpu(&op, |xi| -xi, x),
+        // TODO: generalize transcental uops to other dtypes?
         Op::Exp(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).exp()), x),
         Op::Log(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).ln()), x),
         Op::Sinh(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).sinh()), x),
         Op::Cosh(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).cosh()), x),
         Op::Tanh(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).tanh()), x),
-        // sigmoid
-        // relu
         Op::Sum(x, dim, keepdim) => reduce_cpu(|xi, yi| xi + yi, x, *dim, *keepdim),
-        // max
-        // min
-        // mean
-        // var
-        Op::Matmul(X, Y) => {
-            // 1. def O(n^3)
-            // 2. data oriented(cache)/pthreads/SIMD
-            let (n, m1, m2, p) = (X.shape[0], X.shape[1], Y.shape[0], Y.shape[1]);
-            assert_eq!(m1, m2, "Shape mismatch in operation");
-            assert_eq!(X.ndim, 2, "X must be a 2D tensor");
-            assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
-
-            let Z = tpy::zeros(vec![n, p], Dtype::Float32);
-
-            {
-                let (X_storage, Y_storage, mut Z_storage) = (
-                    X.storage.borrow(),
-                    Y.storage.borrow(),
-                    Z.storage.borrow_mut(),
-                );
-
-                for i in 0..n {
-                    for j in 0..p {
-                        // linear combination of p basis vectors in R^m mapped to
-                        // X[n][m] * Y[m][p]
-
-                        // [n][m]: m basis vectors in R^n
-                        // [m][p]: p basis vectors in R^m
-                        for k in 0..m1 {
-                            let x = X_storage.data[i * X.stride[0] + k * X.stride[1]];
-                            let y = Y_storage.data[k * Y.stride[0] + j * Y.stride[1]];
-                            Z_storage.data[i * Z.stride[0] + j * Z.stride[1]] += x * y;
-                        }
-                    }
-                }
-            }
-
-            Ok(Z)
-        }
+        Op::Max(x, dim, keepdim) => reduce_cpu(
+            // TODO: maybe_reduce_cpu where F: DTypeVal, DTypeVal -> Option<DTypeVal>?
+            |xi, yi| match xi.partial_cmp(&yi).unwrap() {
+                cmp::Ordering::Less => yi,
+                cmp::Ordering::Equal => xi,
+                cmp::Ordering::Greater => xi,
+            },
+            x,
+            *dim,
+            *keepdim,
+        ),
+        Op::Matmul(X, Y) => matmul_cpu(X, Y),
     }
 }
 
-// picograd does not support broadcastable map implementation with return-oriented "out" arg
 fn map_cpu<F>(op: &Op, f: F, x: &Tensor) -> Result<Tensor, OpForwardError>
 where
     F: Fn(DtypeVal) -> DtypeVal,
@@ -161,9 +57,8 @@ where
         ndim: x.ndim,
         shape: x.shape.clone(),
         stride: x.stride.clone(),
-        input_op: Some(Box::new(op.clone())), // Box since Op owns Tensors
+        input_op: Some(Box::new(op.clone())),
         requires_grad: x.requires_grad,
-        // alloc new storage
         storage: Rc::new(RefCell::new(Storage {
             data: x.storage.borrow().data.iter().map(|&xi| f(xi)).collect(),
             grad: None,
@@ -280,4 +175,106 @@ where
     }
 
     Ok(y)
+}
+
+fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {
+    // 1. def O(n^3)
+    // 2. data oriented(cache)/pthreads/SIMD
+    let (n, m1, m2, p) = (X.shape[0], X.shape[1], Y.shape[0], Y.shape[1]);
+    assert_eq!(m1, m2, "Shape mismatch in operation");
+    assert_eq!(X.ndim, 2, "X must be a 2D tensor");
+    assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
+
+    let Z = tpy::zeros(vec![n, p], Dtype::Float32);
+
+    {
+        let (X_storage, Y_storage, mut Z_storage) = (
+            X.storage.borrow(),
+            Y.storage.borrow(),
+            Z.storage.borrow_mut(),
+        );
+
+        for i in 0..n {
+            for j in 0..p {
+                // linear combination of p basis vectors in R^m mapped to
+                // X[n][m] * Y[m][p]
+
+                // [n][m]: m basis vectors in R^n
+                // [m][p]: p basis vectors in R^m
+                for k in 0..m1 {
+                    let x = X_storage.data[i * X.stride[0] + k * X.stride[1]];
+                    let y = Y_storage.data[k * Y.stride[0] + j * Y.stride[1]];
+                    Z_storage.data[i * Z.stride[0] + j * Z.stride[1]] += x * y;
+                }
+            }
+        }
+    }
+
+    Ok(Z)
+}
+
+impl Add for DtypeVal {
+    type Output = DtypeVal;
+
+    fn add(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x + y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x + y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl AddAssign for DtypeVal {
+    fn add_assign(&mut self, other: Self) {
+        *self = self.add(other);
+    }
+}
+
+impl Sub for DtypeVal {
+    type Output = DtypeVal;
+
+    fn sub(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x - y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x - y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Mul for DtypeVal {
+    type Output = DtypeVal;
+
+    fn mul(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x * y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x * y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Div for DtypeVal {
+    type Output = DtypeVal;
+
+    fn div(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (DtypeVal::Float32(x), DtypeVal::Float32(y)) => DtypeVal::Float32(x / y),
+            (DtypeVal::Int32(x), DtypeVal::Int32(y)) => DtypeVal::Int32(x / y),
+            _ => todo!(),
+        }
+    }
+}
+
+impl Neg for DtypeVal {
+    type Output = DtypeVal;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            DtypeVal::Float32(x) => DtypeVal::Float32(-x),
+            DtypeVal::Int32(x) => DtypeVal::Int32(-x),
+            _ => todo!(),
+        }
+    }
 }
