@@ -4,8 +4,6 @@ import numpy as np
 import torch
 import picograd
 
-# see: https://pytorch.org/docs/stable/notes/numerical_accuracy.html
-
 # ********************************************* HELPERS **********************************************
 def assrt(input_shapes, f_tch, f_pg=None, l=-2, h=2, atol=1e-6, rtol=1e-3, grad_atol=1e-4, grad_rtol=1e-3, rg=False):
   if f_pg is None: f_pg = f_tch
@@ -192,6 +190,7 @@ class TestBinOps(unittest.TestCase):
 
 class TestReduceOps(unittest.TestCase):
   def test_sum(self):
+    pass
     # TODO:  for fnn verify picograd.sum(softmax()) == 1
     # assrt([(45,3)], lambda x: x.sum())
     # assrt([(3,4,5,6)], lambda x: x.sum(axis=3))

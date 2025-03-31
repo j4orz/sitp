@@ -51,7 +51,7 @@ impl Tensor {
             Device::Cpu => forward_cpu(op),
             // Device::Gpu => forward_wgsl(op),
             // Device::Cuda => forward_cuda(op),
-            _ => todo!(),
+            _ => unimplemented!("picograd only supports cpu, gpu(opencl) or nv(cuda)"),
         }
     }
 

@@ -14,11 +14,7 @@ fn main() {
     "
     );
 
-    // -smell?: map_err: tensor/op error -> python error in lib_py.rs
-    // -go through all comments. TODO, todo!(), panic!()...
-
-    // backward---
-
+    // TODO: -smell?: map_err: tensor/op error -> python error in lib_py.rs
     let device = Device::Gpu;
     let X = picograd::tpy::ones(vec![3, 1]);
     let Y = picograd::tpy::ones(vec![1, 3]);

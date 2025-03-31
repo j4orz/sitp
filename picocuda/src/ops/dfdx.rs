@@ -17,19 +17,19 @@ impl Op {
                 //     (&dx * &grad.clone()).unwrap(),
                 //     (&dy * &grad.clone()).unwrap(),
                 // ]
-                todo!()
+                unimplemented!()
             }
             Op::Mul(x, y) => vec![(y * &grad.clone()).unwrap(), (x * &grad.clone()).unwrap()],
-            Op::Div(x, y) => todo!(),
-            Op::Neg(x) => todo!(),
-            Op::Exp(x) => todo!(),
-            Op::Log(x) => todo!(),
-            Op::Sinh(x) => todo!(),
-            Op::Cosh(x) => todo!(),
-            Op::Tanh(x) => todo!(),
-            Op::Matmul(x, y) => todo!(),
-            Op::Sum(tensor, _, _) => todo!(),
-            Op::Max(tensor, _, _) => todo!(),
+            Op::Div(x, y) => unimplemented!(),
+            Op::Neg(x) => unimplemented!(),
+            Op::Exp(x) => unimplemented!(),
+            Op::Log(x) => unimplemented!(),
+            Op::Sinh(x) => unimplemented!(),
+            Op::Cosh(x) => unimplemented!(),
+            Op::Tanh(x) => unimplemented!(),
+            Op::Matmul(x, y) => unimplemented!(),
+            Op::Sum(tensor, _, _) => unimplemented!(),
+            Op::Max(tensor, _, _) => unimplemented!(),
         }
     }
 }

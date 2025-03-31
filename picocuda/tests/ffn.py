@@ -131,7 +131,7 @@ for _ in range(1): # n samples
     # 1. preprocessing
     X_1T = picograd.tensor([context]) # B=1 for inference (1 response)
     X_1TE = C_VE[X_1T] # X_1T ∈ [0..=26] must hold
-    X_1cTE = X_1TE.reshape(-1, T*E) # reshape from 3dims -> 2dims B=1 TE
+    X_1cTE = X_1TE.reshape((-1, T*E)) # reshape from 3dims -> 2dims B=1 TE
     X = X_1cTE
 
     # 2. f: ℝ^d -> [0,1]^k
@@ -139,7 +139,7 @@ for _ in range(1): # n samples
       X = h(X)
     y_hat = F.softmax(X, dim=1)
     print("softmax", y_hat)
-    print("softmax summed", picograd.sum(y_hat,dim=0,keepdim=False))
+    # print("softmax summed", picograd.sum(y_hat,dim=0,keepdim=False))
 
     # 3. sample
     token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
