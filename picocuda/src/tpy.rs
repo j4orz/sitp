@@ -154,6 +154,10 @@ impl Tensor {
         Ok(self._permute(&shape))
     }
 
+    fn item(&self) -> PyResult<DtypeVal> {
+        Ok(self._item())
+    }
+
     // POINTWISE OPS
     fn __add__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
         if let Ok(val) = other.extract::<f32>() {

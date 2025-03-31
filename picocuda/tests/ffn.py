@@ -138,6 +138,7 @@ for _ in range(20): # 20 samples
 
     # sample and autoregressively update context
     token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
+    print(token)
     context = context[1:] + [token]
     output.append(decode[token])
     if token == 0:

@@ -335,6 +335,11 @@ impl Tensor {
             .fold(0, |acc, (i, s)| acc + i * s)
     }
 
+    pub fn _item(&self) -> DtypeVal {
+        let data = &self.storage.borrow().data;
+        if data.len() > 1 { todo!() } else { data[0] }
+    }
+
     // *************************************************************************
     // ***************************** BROADCASTING ******************************
     // *************************************************************************
@@ -427,7 +432,6 @@ impl Tensor {
     // 2. x <- F⁻¹(u)
     // see: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     pub fn multinomial(dist: &Tensor, samples: usize, replacement: bool) -> Tensor {
-        println!("moose {:?}", dist.storage.borrow().data);
         let dist = &dist
             .storage
             .borrow()
@@ -443,7 +447,6 @@ impl Tensor {
             })
             .collect::<Vec<_>>();
 
-        println!("moose {:?}", dist);
         let total = dist.iter().sum::<f32>();
         let mut output = Vec::with_capacity(samples);
         for _ in 0..samples {
