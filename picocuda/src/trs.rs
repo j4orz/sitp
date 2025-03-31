@@ -215,10 +215,14 @@ impl Tensor {
             .filter(|(i, x)| **x == 1)
             .map(|(i, x)| i)
             .collect::<HashSet<_>>();
-        let squeezed_noop_indices = squeezed_indices
-            .intersection(&noop_indices)
-            .copied()
-            .collect::<HashSet<_>>();
+        let squeezed_noop_indices = if squeezed_indices.len() == 0 {
+            noop_indices
+        } else {
+            squeezed_indices
+                .intersection(&noop_indices)
+                .copied()
+                .collect::<HashSet<_>>()
+        };
 
         let (new_shape, new_stride) = (
             self.shape

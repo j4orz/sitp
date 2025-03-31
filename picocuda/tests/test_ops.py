@@ -101,6 +101,10 @@ class TestViewOps(unittest.TestCase):
     assrt([(1,3,6,6)], lambda x: x.squeeze(0))
     assrt([(4,3,1,6)], lambda x: x.squeeze(1))
     assrt([(4,3,6,6)], lambda x: x.squeeze(3))
+    assrt([(4,3,6,1)], lambda x: x.squeeze(-1))
+    assrt([(4,3,6,6)], lambda x: x.squeeze())
+    assrt([(1,3,6,6)], lambda x: x.squeeze())
+    assrt([(2,3,1)], lambda x: x.squeeze())
 
   def test_unsqueeze(self):
     pass

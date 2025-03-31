@@ -59,6 +59,15 @@ pub fn arange(start: usize, end: usize) -> Tensor {
     trs::alloc(&shape, data)
 }
 
+fn decode_pyi(pyi: i32, n: usize) -> usize {
+    if pyi < 0 {
+        let ifromn = (pyi * -1) as usize;
+        n - ifromn
+    } else {
+        pyi as usize
+    }
+}
+
 #[pymethods]
 impl Tensor {
     fn numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, numpy::PyArrayDyn<f32>>> {
@@ -156,7 +165,11 @@ impl Tensor {
 
     #[pyo3(signature = (*args))]
     fn squeeze(&self, args: Bound<'_, PyTuple>) -> PyResult<Tensor> {
-        let dims = args.extract::<Vec<usize>>()?;
+        let dims = args
+            .extract::<Vec<i32>>()?
+            .iter()
+            .map(|&x| decode_pyi(x, self.ndim))
+            .collect::<Vec<_>>();
         Ok(self._squeeze(&dims))
     }
 
