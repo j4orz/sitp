@@ -153,9 +153,8 @@ impl Tensor {
     }
 
     // VIEW OPS
-    #[pyo3(signature = (*args))]
-    fn reshape(&self, args: Bound<'_, PyTuple>) -> PyResult<Tensor> {
-        let shape = args.extract::<Vec<i32>>()?;
+    fn reshape(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
+        let shape = shape.extract::<Vec<i32>>()?;
         Ok(self._reshape(&shape)?)
     }
 

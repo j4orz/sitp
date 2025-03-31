@@ -52,16 +52,19 @@ class TestViewOps(unittest.TestCase):
     assrt([(4,3,6,6)], lambda x: x.reshape((12,6,6)))
     assrt([(4,3,6,6)], lambda x: x.reshape((-1,3,6,6)))
     assrt([(4,3,6,6)], lambda x: x.reshape((-1,1,6,6)))
-    # self.assrt_exception([(3,4)], lambda x: x.reshape((-1,-1,2)), expected=RuntimeError)
-    # self.assrt_exception([(3,4)], lambda x: x.reshape((-1,-1,-1,2)), expected=RuntimeError)
-    
     assrt([()], lambda x: x.reshape(()))
     assrt([(1,)], lambda x: x.reshape(()))
     assrt([()], lambda x: x.reshape((1,)))
     assrt([()], lambda x: x.reshape((1,1,1)))
+    # self.assrt_exception([(3,4)], lambda x: x.reshape((-1,-1,2)), expected=RuntimeError)
+    # self.assrt_exception([(3,4)], lambda x: x.reshape((-1,-1,-1,2)), expected=RuntimeError)
+    # with self.assertRaises(ValueError):
+    #   x = Tensor.ones((4,3,6,6))
+    #   x.reshape([])
 
   def test_permute(self):
     assrt([(4,3)], lambda x: x.permute((1,0)))
+    # TODO:
     # assrt([(4,3)], lambda x: x.permute((0,1)))
     # assrt([(1,2,3,4)], lambda x: x.permute((3,0,2,1)))
     # assrt([(3,4,5,6)], lambda x: x.permute((3,2,1,0)))
@@ -136,7 +139,20 @@ class TestUOps(unittest.TestCase):
     assrt([(3,3)], lambda x: torch.log(x), lambda x: picograd.log(x))
 
   def test_sum(self):
-    assrt([(3,3)], lambda x: x.sum(dim=1, keepdim=True), lambda x: picograd.sum(x, 1, True))
+    assrt([(45,3)], lambda x: x.sum())
+    # assrt([(3,4,5,6)], lambda x: x.sum(axis=3))
+    # assrt([(3,4,5,6)], lambda x: x.sum(axis=(1,3)))
+    # assrt([(3,4,5,6)], lambda x: x.sum(axis=(0,2)))
+    # assrt([(3,4,5,6)], lambda x: x.sum(axis=(1,2)))
+    # assrt([(3,4,5,6)], lambda x: x.sum(axis=1))
+    # assrt([(3,4,5,6)], lambda x: x.sum(axis=1, keepdim=True))
+    # assrt([()], lambda x: x.sum())
+    # assrt([()], lambda x: x.sum(0))
+    # assrt([()], lambda x: x.sum(-1))
+    # assrt([()], lambda x: x.sum(()))
+    # self.helper_test_exception([(3,4,5,6)], lambda x: x.sum(5), lambda x: x.sum(5), expected=IndexError)
+    # self.helper_test_exception([()], lambda x: x.sum(1), lambda x: x.sum(1), expected=IndexError)
+    # self.helper_test_exception([()], lambda x: x.sum((1,)), lambda x: x.sum((1,)), expected=IndexError)
 
 class TestBinOps(unittest.TestCase):
   def test_add(self):

@@ -92,7 +92,7 @@ print(X_NT.shape, Y_N.shape)
 # for step in range(100): #200000):
 #     # 1. forward
 #     # minibatch: X_NT -> X_BT
-#     i_B = torch.randint(0, X_NT.shape[0], (B,))
+#     i_B = picograd.randint(0, X_NT.shape[0], (B,))
 #     X_BT, Y_B = X_NT[i_B], Y_N[i_B]
 
 #     # embed: X_BT -> X_BTE
@@ -138,9 +138,12 @@ for _ in range(1): # n samples
     for h in model:
       X = h(X)
     y_hat = F.softmax(X, dim=1)
+    print("softmax", y_hat)
+    print("softmax summed", picograd.sum(y_hat,dim=0,keepdim=False))
 
     # 3. sample
     token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
+    print("token sampled", token)
     output.append(decode[token])
     # 4. autoregressively update
     context = context[1:] + [token]
