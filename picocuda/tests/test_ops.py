@@ -74,7 +74,7 @@ class TestViewOps(unittest.TestCase):
   def test_transpose(self):
     pass
 
-  def test_getitem_tensor(self):
+  def test_getitem_embedding(self):
     B, T, V, E = 32, 3, 27, 10
     C_VEtch, C_VEpg = gen_inputs([(V, E)], -2, 2, rg=False)
     C_VEtch, C_VEpg = C_VEtch[0], C_VEpg[0]
@@ -83,7 +83,7 @@ class TestViewOps(unittest.TestCase):
     X_BTtch, X_BTpg = torch.tensor(X_BTnp), picograd.tensor(X_BTnp)
     X_BTEtch, X_BTEpg = C_VEtch[X_BTtch], C_VEpg[X_BTpg]
 
-    np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)
+    np.testing.assert_allclose(X_BTEtch.numpy(), X_BTEpg.numpy(), atol=1e-6, rtol=1e-6)# f: ℝ^d -> [0,1]^kr
 
   def test_gather(self):
     pass
@@ -98,7 +98,9 @@ class TestViewOps(unittest.TestCase):
     pass
 
   def test_squeeze(self):
-    pass
+    assrt([(1,3,6,6)], lambda x: x.squeeze(0))
+    assrt([(4,3,1,6)], lambda x: x.squeeze(1))
+    assrt([(4,3,6,6)], lambda x: x.squeeze(3))
 
   def test_unsqueeze(self):
     pass
@@ -111,7 +113,7 @@ class TestViewOps(unittest.TestCase):
 
 class TestUOps(unittest.TestCase):
   def test_tanh(self):
-    assrt([(3,3)], lambda x: torch.tanh(x), lambda x: picograd.tanh(x))
+    assrt([(45,65)], lambda x: torch.tanh(x), lambda x: picograd.tanh(x))
 
   def test_exp(self):
     assrt([(3,3)], lambda x: torch.exp(x), lambda x: picograd.exp(x))
@@ -154,7 +156,7 @@ class TestBinOps(unittest.TestCase):
     assrt([(3,3)], lambda x: x/-1)
 
   def test_matmul(self):
-    # assrt([(64), (6k4,99)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
+    assrt([(3), (3,10)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
     assrt([(3,3), (3,3)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
 
 class TestReduceOps(unittest.TestCase):

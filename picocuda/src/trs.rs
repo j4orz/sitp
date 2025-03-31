@@ -7,6 +7,7 @@ use rand::{
 use std::{
     cell::RefCell,
     cmp::{Ordering, max},
+    collections::HashSet,
     fmt::{self, Display},
     hash, iter,
     rc::Rc,
@@ -20,10 +21,10 @@ use thiserror::Error;
 //      2. mutation: RefCell<_>(safe) vs UnsafeCell<_>(speed)j
 // impl Tensor:
 // - CONSTRUCTORS (alloc): alloc
-// - VIEWS (no alloc): continuous_view, noncontinuous_view, reshape, permute, getitem
+// - VIEWS (no alloc): continuous_view, noncontinuous_view, reshape, permute, getitem, squeeze, unsqueeze
 // - INDEXING (internal): shape_to_stride, encode, decode
 // - BROADCASTING: broadcast_shape, clamp_stride, broadcast_logidx
-// - SAMPLING: ran
+// - SAMPLING: randn
 
 // NB:
 // - unsendable: does pytorch user code multithread tensors?
@@ -144,21 +145,7 @@ impl Tensor {
     // *************************** VIEWS (no alloc) ****************************
     // *************************************************************************
 
-    pub fn continuous_view(&self, shape: &[usize]) -> Self {
-        Self {
-            ndim: shape.len(),
-            shape: shape.to_vec(),
-            stride: Self::shape_to_stride(shape),
-            input_op: self.input_op.clone(), // Box<_>.clone()?
-            requires_grad: self.requires_grad,
-            storage: self.storage.clone(),
-            device: self.device.clone(),
-            layout: self.layout.clone(),
-            dtype: self.dtype.clone(),
-        }
-    }
-
-    pub fn noncontinuous_view(&self, shape: &[usize], stride: &[usize]) -> Self {
+    pub fn _view(&self, shape: &[usize], stride: &[usize]) -> Self {
         Self {
             ndim: shape.len(),
             shape: shape.to_vec(),
@@ -212,18 +199,51 @@ impl Tensor {
             }
         }?;
 
-        Ok(self.continuous_view(&new_shape))
+        Ok(self._view(&new_shape, &Self::shape_to_stride(&new_shape))) // TODO: alloc just to ref which allocs gain inside ._view?
     }
 
     pub fn _permute(&self, indices: &[usize]) -> Self {
         todo!()
     }
 
+    pub fn _squeeze(&self, dim: &Vec<usize>) -> Self {
+        let squeezed_indices = dim.iter().copied().collect::<HashSet<_>>();
+        let noop_indices = self
+            .shape
+            .iter()
+            .enumerate()
+            .filter(|(i, x)| **x == 1)
+            .map(|(i, x)| i)
+            .collect::<HashSet<_>>();
+        let squeezed_noop_indices = squeezed_indices
+            .intersection(&noop_indices)
+            .copied()
+            .collect::<HashSet<_>>();
+
+        let (new_shape, new_stride) = (
+            self.shape
+                .iter()
+                .enumerate()
+                .filter(|(i, x)| !squeezed_noop_indices.contains(i))
+                .map(|(i, x)| x)
+                .copied()
+                .collect::<Vec<_>>(),
+            self.stride
+                .iter()
+                .enumerate()
+                .filter(|(i, x)| !squeezed_noop_indices.contains(i))
+                .map(|(i, x)| x)
+                .copied()
+                .collect::<Vec<_>>(),
+        );
+        self._view(&new_shape, &new_stride)
+    }
+
     // Z_I1I2...IND2..DN = X_*D1*D2...DN[I_I1I2..IN]
     // I indexes into X's first dimension
     // so I ∈ 0..D1 must hold.
     // e.g C_VE[X_BT] for a character-level language model where |V| = 27 ==> X_BT ∈ 0..26
-    pub fn getitem(&self, I: &Tensor) -> Self {
+    pub fn getitem_embedding(&self, I: &Tensor) -> Self {
         let X = self;
         let shape_z = I
             .shape

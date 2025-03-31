@@ -99,7 +99,7 @@ impl Tensor {
     }
 
     fn __getitem__(&self, I: Tensor) -> PyResult<Self> {
-        Ok(self.getitem(&I))
+        Ok(self.getitem_embedding(&I))
     }
 
     #[getter]
@@ -152,6 +152,12 @@ impl Tensor {
     fn permute(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
         let shape = shape.extract::<Vec<usize>>()?;
         Ok(self._permute(&shape))
+    }
+
+    #[pyo3(signature = (*args))]
+    fn squeeze(&self, args: Bound<'_, PyTuple>) -> PyResult<Tensor> {
+        let dims = args.extract::<Vec<usize>>()?;
+        Ok(self._squeeze(&dims))
     }
 
     fn item(&self) -> PyResult<DtypeVal> {

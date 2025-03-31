@@ -1,5 +1,5 @@
 """
-model: Neural Language Models (Bengio et al. 2003) URL: https://www.jmlr.org/papers/volume3/bengio03a/bengio03a.pdf
+model: Neural Language Models (Bengio et al. 2003)
 
 Dimension key:
 # windows
@@ -125,22 +125,25 @@ print(X_NT.shape, Y_N.shape)
 # plt.plot(steps, losses)
 
 # *********************INFERENCE LOOP*********************
-for _ in range(20): # 20 samples
+for _ in range(1): # n samples
   output, context = [], [0] * T
   while True:
+    # 1. preprocessing
     X_1T = picograd.tensor([context]) # B=1 for inference (1 response)
     X_1TE = C_VE[X_1T] # X_1T ∈ [0..=26] must hold
     X_1cTE = X_1TE.reshape(-1, T*E) # reshape from 3dims -> 2dims B=1 TE
     X = X_1cTE
+
+    # 2. f: ℝ^d -> [0,1]^k
     for h in model:
       X = h(X)
     y_hat = F.softmax(X, dim=1)
 
-    # sample and autoregressively update context
+    # 3. sample
     token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
-    print(token)
-    context = context[1:] + [token]
     output.append(decode[token])
+    # 4. autoregressively update
+    context = context[1:] + [token]
     if token == 0:
         break
   print(''.join(output))

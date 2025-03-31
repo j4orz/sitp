@@ -180,12 +180,12 @@ where
 fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {
     // 1. def O(n^3)
     // 2. data oriented(cache)/pthreads/SIMD
-    let (n, m1, m2, p) = (X.shape[0], X.shape[1], Y.shape[0], Y.shape[1]);
-    assert_eq!(m1, m2, "Shape mismatch in operation");
+    let (N, M1, M2, P) = (X.shape[0], X.shape[1], Y.shape[0], Y.shape[1]);
+    assert_eq!(M1, M2, "Shape mismatch in operation");
     assert_eq!(X.ndim, 2, "X must be a 2D tensor");
     assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
 
-    let Z = tpy::zeros(vec![n, p], Dtype::Float32);
+    let Z = tpy::zeros(vec![N, P], Dtype::Float32);
 
     {
         let (X_storage, Y_storage, mut Z_storage) = (
@@ -194,17 +194,21 @@ fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {
             Z.storage.borrow_mut(),
         );
 
-        for i in 0..n {
-            for j in 0..p {
-                // linear combination of p basis vectors in R^m mapped to
-                // X[n][m] * Y[m][p]
+        // p linear combinations of m basis vectors in R^n (linear combination p times)
 
-                // [n][m]: m basis vectors in R^n
-                // [m][p]: p basis vectors in R^m
-                for k in 0..m1 {
-                    let x = X_storage.data[i * X.stride[0] + k * X.stride[1]];
-                    let y = Y_storage.data[k * Y.stride[0] + j * Y.stride[1]];
-                    Z_storage.data[i * Z.stride[0] + j * Z.stride[1]] += x * y;
+        // (nxm)@(m@p)
+        for n in 0..N {
+            for p in 0..P {
+                // NB: p linear combinations of m2 entries mapped to m1 basis vectors in R^n
+                // the loops over n p are interchangeable (n*p or p*n).
+                // wikpedia has n*p even though p*n is more geometically intuitive
+
+                // dot product of m entries mapped to m basis vectors
+                for m in 0..M1 {
+                    // dot product:
+                    let x = X_storage.data[n * X.stride[0] + m * X.stride[1]];
+                    let y = Y_storage.data[m * Y.stride[0] + p * Y.stride[1]];
+                    Z_storage.data[n * Z.stride[0] + p * Z.stride[1]] += x * y;
                 }
             }
         }
