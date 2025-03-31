@@ -177,14 +177,22 @@ where
     Ok(y)
 }
 
+// 1. def O(n^3)
+// 2. data oriented(cache)/pthreads/SIMD
 fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {
-    // 1. def O(n^3)
-    // 2. data oriented(cache)/pthreads/SIMD
+    // promote 1D -> 2D via unsqueeze
+    let (X, Y, unsqzd) = match (X.ndim, Y.ndim) {
+        (2, 1) => (X.clone(), Y._unsqueeze(1), Some(1)), // matvec
+        (1, 2) => (X._unsqueeze(0), Y.clone(), Some(0)), // vecmat
+        (1, 1) => (X._unsqueeze(1), Y._unsqueeze(0), Some(0)), // vecvec
+        (2, 2) => (X.clone(), Y.clone(), None),          // matmat
+        _ => unimplemented!("matmul only supports 1D and 2D tensors"),
+    };
+
     let (N, M1, M2, P) = (X.shape[0], X.shape[1], Y.shape[0], Y.shape[1]);
     assert_eq!(M1, M2, "Shape mismatch in operation");
     assert_eq!(X.ndim, 2, "X must be a 2D tensor");
     assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
-
     let Z = tpy::zeros(vec![N, P], Dtype::Float32);
 
     {
@@ -212,6 +220,14 @@ fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {
                 }
             }
         }
+    }
+
+    if let Some(dim) = unsqzd {
+        let mut Zsqzd = Z;
+        Zsqzd.shape.remove(dim);
+        Zsqzd.stride.remove(dim);
+        Zsqzd.ndim -= 1;
+        return Ok(Zsqzd);
     }
 
     Ok(Z)

@@ -10,9 +10,9 @@ import os
 def assrt(input_shapes, f_tch, f_pg=None, l=-2, h=2, atol=1e-6, rtol=1e-3, grad_atol=1e-4, grad_rtol=1e-3, rg=False):
   if f_pg is None: f_pg = f_tch
   xtch, xpg = gen_inputs(input_shapes, l, h, rg)
-  print("x:", xtch)
+  # print("x:", xtch)
   ytch, ypg = f_tch(*xtch), f_pg(*xpg)
-  print("y shape/stride", ytch.shape, ytch.stride())
+  # print("y shape/stride", ytch.shape, ytch.stride())
   verify_outputs("forward pass", ytch.detach().numpy(), ypg.detach().numpy(), atol=atol, rtol=rtol)
   # compare(f"backward pass tensor {i}", tt_grad.numpy(), t.grad.detach().numpy(), atol=grad_atol, rtol=grad_rtol)
 
@@ -171,6 +171,7 @@ class TestBinOps(unittest.TestCase):
 
   def test_matmul(self):
     assrt([(3), (3,10)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
+    assrt([(3,10), (10)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
     assrt([(3,3), (3,3)], lambda x,y: x.matmul(y), lambda x,y: x @ y)
 
 class TestReduceOps(unittest.TestCase):
@@ -207,24 +208,24 @@ class TestReduceOps(unittest.TestCase):
   def test_logcumsumexp(self):
     pass
 
-class TestProcessingOps(unittest.TestCase):
-  def test_matmul(self):
-    pass
-
-  def test_dot(self):
-    pass
-
-  # def test_conv2d(self):
-  #   pass
-
-  # def test_avgpool2d(self):
-  #   pass
-
-  # def test_maxpool2d(self):
-  #   pass
-
-#   def test_topk(self):
+# class TestProcessingOps(unittest.TestCase):
+#   def test_matmul(self):
 #     pass
+
+#   def test_dot(self):
+#     pass
+
+#   # def test_conv2d(self):
+#   #   pass
+
+#   # def test_avgpool2d(self):
+#   #   pass
+
+#   # def test_maxpool2d(self):
+#   #   pass
+
+# #   def test_topk(self):
+# #     pass
 
 class TestNetworkOps(unittest.TestCase):
   def test_linear(self):
