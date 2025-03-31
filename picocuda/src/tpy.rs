@@ -2,6 +2,7 @@ use crate::ops::cpu_ops::OpForwardError;
 use crate::trs::{self, Tensor, ViewOpError};
 use crate::{Device, Dtype, DtypeVal, Layout, nn};
 use numpy::{IntoPyArray, PyArrayMethods, PyUntypedArrayMethods};
+use pyo3::types::PyInt;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList, types::PyTuple};
 use std::ops::{Add, Div, Mul, Sub};
 
@@ -171,6 +172,11 @@ impl Tensor {
             .map(|&x| decode_pyi(x, self.ndim))
             .collect::<Vec<_>>();
         Ok(self._squeeze(&dims))
+    }
+
+    fn unsqueeze(&self, dim: Bound<'_, PyInt>) -> PyResult<Tensor> {
+        let dim = decode_pyi(dim.extract::<i32>()?, self.ndim + 1); // unsqueeze(-1) == unsqueeze(n)
+        Ok(self._unsqueeze(dim))
     }
 
     fn item(&self) -> PyResult<DtypeVal> {

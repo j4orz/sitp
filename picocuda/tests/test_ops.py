@@ -105,9 +105,19 @@ class TestViewOps(unittest.TestCase):
     assrt([(4,3,6,6)], lambda x: x.squeeze())
     assrt([(1,3,6,6)], lambda x: x.squeeze())
     assrt([(2,3,1)], lambda x: x.squeeze())
+    # self.helper_test_exception([(4,3,6,6)], lambda x: torch.squeeze(x, 50), lambda x: x.squeeze(dim=50), expected=IndexError)
+    # self.helper_test_exception([(4,3,6,6)], lambda x: torch.squeeze(x, -50), lambda x: x.squeeze(dim=-50), expected=IndexError)
+    # self.helper_test_exception([()], lambda x: torch.squeeze(x, 10), lambda x: x.squeeze(dim=10), expected=IndexError)
+    # self.helper_test_exception([()], lambda x: torch.squeeze(x, 1), lambda x: x.squeeze(dim=1), expected=IndexError)
+    # self.helper_test_exception([()], lambda x: torch.squeeze(x, -2), lambda x: x.squeeze(dim=-2), expected=IndexError)
 
   def test_unsqueeze(self):
-    pass
+    assrt([(4,3,6,6)], lambda x: x.unsqueeze(0))
+    assrt([(4,3,6,6)], lambda x: x.unsqueeze(1))
+    assrt([(4,3,6,6)], lambda x: x.unsqueeze(4))
+    assrt([(4,3,6,6)], lambda x: x.unsqueeze(-1))
+    assrt([(4,3,6,6)], lambda x: x.unsqueeze(-3))
+    assrt([()], lambda x: x.unsqueeze(0))
 
   def test_flatten(self):
     pass

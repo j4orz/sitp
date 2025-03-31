@@ -243,6 +243,13 @@ impl Tensor {
         self._view(&new_shape, &new_stride)
     }
 
+    pub fn _unsqueeze(&self, dim: usize) -> Self {
+        let (mut new_shape, mut new_stride) = (self.shape.clone(), self.stride.clone());
+        new_shape.insert(dim, 1);
+        new_stride.insert(dim, 1);
+        self._view(&new_shape, &new_stride)
+    }
+
     // Z_I1I2...IND2..DN = X_*D1*D2...DN[I_I1I2..IN]
     // I indexes into X's first dimension
     // so I ∈ 0..D1 must hold.
