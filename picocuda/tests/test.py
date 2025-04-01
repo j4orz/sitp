@@ -2,7 +2,9 @@ import unittest
 import os
 import numpy as np
 import torch
+import torch.nn.functional as Ftch
 import picograd
+import picograd.nn.functional as Fpg
 
 # ********************************************* HELPERS **********************************************
 def assrt(input_shapes, f_tch, f_pg=None, l=-2, h=2, atol=1e-6, rtol=1e-3, grad_atol=1e-4, grad_rtol=1e-3, rg=False):
@@ -226,21 +228,11 @@ class TestNetworkOps(unittest.TestCase):
   def test_nllloss(self):
     pass  
 
-  # TODO:
   def test_softmax(self):
-    helper_test_op([(45,65)], torch.nn.Softmax(dim=1), Tensor.softmax, atol=1e-7, grad_atol=1e-7)
-    helper_test_op([(45)], torch.nn.Softmax(dim=0), Tensor.softmax, atol=1e-7, grad_atol=1e-7)
-    helper_test_op([()], torch.nn.Softmax(dim=0), Tensor.softmax, atol=1e-7, grad_atol=1e-7)
-    helper_test_op([()], torch.nn.Softmax(dim=-1), Tensor.softmax, atol=1e-7, grad_atol=1e-7)
-  def test_softmax_other_axis(self):
-    helper_test_op([(10,10,10)], lambda x: x.softmax(0), atol=1e-7, grad_atol=2e-7)
-    helper_test_op([(10,10,10)], lambda x: x.softmax(1), atol=1e-7, grad_atol=2e-7)
-    helper_test_op([(10,10,10)], lambda x: x.softmax(2), atol=1e-7, grad_atol=2e-7)
-
-# SAMPLING TODO:
-# - softmax
-# - sum (for user debugging)
-# - multinomial. kolmgorov-smirnov.
+    assrt([(45,65)], lambda x: Ftch.softmax(x, dim=1), lambda x: Fpg.softmax(x, dim=1), atol=1e-7, grad_atol=1e-7)
+    assrt([(45)], lambda x: Ftch.softmax(x, dim=0), lambda x: Fpg.softmax(x, dim=0), atol=1e-7, grad_atol=1e-7)
+    assrt([()], lambda x: Ftch.softmax(x, dim=0), lambda x: Fpg.softmax(x, dim=0), atol=1e-7, grad_atol=1e-7)
+    assrt([()], lambda x: Ftch.softmax(x, dim=-1), lambda x: Fpg.softmax(x, dim=-1), atol=1e-7, grad_atol=1e-7)
 
 # TODO:
 # - https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test

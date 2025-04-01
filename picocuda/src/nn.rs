@@ -10,7 +10,7 @@ pub fn cross_entropy(p: Tensor, q: Tensor) -> PyResult<Tensor> {
 }
 
 #[pyfunction]
-pub fn softmax(x: Tensor, dim: usize) -> PyResult<Tensor> {
+pub fn _softmax(x: Tensor, dim: usize) -> PyResult<Tensor> {
     let shifted = x.sub(&x.max(dim, true)?)?;
     let exp = shifted.exp()?;
     let expsum = exp.sum(dim, true)?;

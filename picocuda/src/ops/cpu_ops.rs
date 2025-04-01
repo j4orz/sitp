@@ -137,48 +137,44 @@ where
     Ok(z)
 }
 
-fn reduce_cpu<F>(
-    f: F,
-    x: &Tensor,
-    dim_reduce: usize,
-    keepdim: bool,
-) -> Result<Tensor, OpForwardError>
+fn reduce_cpu<F>(f: F, x: &Tensor, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError>
 where
     F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
 {
+    if x.ndim == 0 {
+        return Ok(x.clone());
+    }
     let y_shape = x
         .shape
         .iter()
         .enumerate()
-        .map(|(i, &dim_size)| if i == dim_reduce { 1 } else { dim_size })
+        .map(|(i, &dim_size)| if i == dim { 1 } else { dim_size })
         .collect();
-    let mut y = tpy::zeros(y_shape, Dtype::Float32); // clone because of python/rust memory mismatch
+    let mut y = tpy::zeros(y_shape, Dtype::Float32);
 
     {
         let (x_storage, mut y_storage) = (x.storage.borrow(), y.storage.borrow_mut());
         for physy in 0..y.numel() {
-            let mut logy = Tensor::encode(physy, &y.shape);
+            // reconstructing logx from phsy by undoing reduce via logx[dim]=d
+            let mut logx = Tensor::encode(physy, &y.shape);
+            for d in 0..x.shape[dim] {
+                logx[dim] = d;
+                let physx = Tensor::decode(&logx, &x.stride);
 
-            for d in 0..x.shape[dim_reduce] {
-                logy[dim_reduce] = d;
-                let physx = Tensor::decode(&logy, &x.stride);
-
-                // accumulate/reduce
+                // y=y+x
                 y_storage.data[physy] = f(y_storage.data[physy], x_storage.data[physx]);
             }
         }
     }
 
     if !keepdim {
-        y.shape.remove(dim_reduce);
+        y.shape.remove(dim);
         y.ndim -= 1;
     }
 
     Ok(y)
 }
 
-// 1. def O(n^3)
-// 2. data oriented(cache)/pthreads/SIMD
 fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {
     // promote 1D -> 2D via unsqueeze
     let (X, Y, unsqzd) = match (X.ndim, Y.ndim) {

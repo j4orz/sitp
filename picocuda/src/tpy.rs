@@ -62,8 +62,12 @@ pub fn arange(start: usize, end: usize) -> Tensor {
 
 fn decode_pyi(pyi: i32, n: usize) -> usize {
     if pyi < 0 {
-        let ifromn = (pyi * -1) as usize;
-        n - ifromn
+        if n == 0 {
+            0
+        } else {
+            let ifromn = (pyi * -1) as usize;
+            n - ifromn
+        }
     } else {
         pyi as usize
     }
@@ -229,6 +233,13 @@ impl Tensor {
     }
 }
 
+// nnops
+#[pyfunction]
+fn softmax(x: Tensor, dim: i32) -> PyResult<Tensor> {
+    let rsi = decode_pyi(dim, x.ndim());
+    nn::_softmax(x, rsi)
+}
+
 #[pyfunction]
 pub fn tensor<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
     fn alloc_from_np<T: numpy::Element, 'py>(
@@ -333,7 +344,7 @@ fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     // nn.functional/nn
     let ff_m = PyModule::new(py, "functional")?;
     ff_m.add_function(wrap_pyfunction!(nn::cross_entropy, &ff_m)?)?;
-    ff_m.add_function(wrap_pyfunction!(nn::softmax, &ff_m)?)?;
+    ff_m.add_function(wrap_pyfunction!(softmax, &ff_m)?)?;
     let nn_m = PyModule::new(py, "nn")?;
     nn_m.add_submodule(&ff_m)?;
     pg_m.add_submodule(&nn_m)?;

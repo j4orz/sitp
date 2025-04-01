@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 // frontend
 pub mod nn;
 pub mod storage;
