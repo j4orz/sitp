@@ -192,14 +192,12 @@ class TestBinOps(unittest.TestCase):
 
 class TestReduceOps(unittest.TestCase):
   def test_sum(self):
-    pass
-    # TODO:  for fnn verify picograd.sum(softmax()) == 1
-    # assrt([(45,3)], lambda x: x.sum())
+    assrt([(45,3)], lambda x: x.sum())
     # assrt([(3,4,5,6)], lambda x: x.sum(axis=3))
     # assrt([(3,4,5,6)], lambda x: x.sum(axis=(1,3)))
     # assrt([(3,4,5,6)], lambda x: x.sum(axis=(0,2)))
     # assrt([(3,4,5,6)], lambda x: x.sum(axis=(1,2)))
-    # assrt([(3,4,5,6)], lambda x: x.sum(axis=1))
+    assrt([(3,4,5,6)], lambda x: x.sum(axis=1))
     # assrt([(3,4,5,6)], lambda x: x.sum(axis=1, keepdim=True))
     # assrt([()], lambda x: x.sum())
     # assrt([()], lambda x: x.sum(0))

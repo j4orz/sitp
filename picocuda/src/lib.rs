@@ -25,7 +25,7 @@ pub enum Layout { Strided  } // Sparse, // MklDnn
 #[rustfmt::skip]
 #[pyclass(eq)]
 #[derive(Clone, Debug, PartialEq)]
-pub enum Dtype { Bool, Float16, Float32, Float64, Int16, Int32, Int64}
+pub enum Dtype { Bool, Float32, Float64, Int32, Int64}
 
 #[rustfmt::skip]
 #[derive(FromPyObject)]

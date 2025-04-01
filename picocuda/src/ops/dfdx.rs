@@ -28,8 +28,8 @@ impl Op {
             Op::Cosh(x) => unimplemented!(),
             Op::Tanh(x) => unimplemented!(),
             Op::Matmul(x, y) => unimplemented!(),
-            Op::Sum(tensor, _, _) => unimplemented!(),
-            Op::Max(tensor, _, _) => unimplemented!(),
+            Op::Sum(tensor, _) => unimplemented!(),
+            Op::Max(tensor, _) => unimplemented!(),
         }
     }
 }

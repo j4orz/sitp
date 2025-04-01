@@ -1,6 +1,8 @@
-use crate::ops::cpu_ops::OpForwardError;
-use crate::trs::{self, Tensor, ViewOpError};
-use crate::{Device, Dtype, DtypeVal, Layout, nn};
+use crate::{
+    Device, Dtype, DtypeVal, Layout, nn,
+    ops::cpu_ops::{OpForwardError, ReduceDimInput},
+    trs::{self, Tensor, ViewOpError},
+};
 use numpy::{IntoPyArray, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::types::PyInt;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyList, types::PyTuple};
@@ -227,6 +229,26 @@ impl Tensor {
         }
     }
 
+    #[pyo3(signature=(dim=None, keepdim=None))]
+    fn sum(&self, dim: Option<usize>, keepdim: Option<bool>) -> PyResult<Tensor> {
+        match (dim, keepdim) {
+            (None, None) => {
+                let output = self
+                    ._sum(None)
+                    .map_err(|e| PyRuntimeError::new_err(e.to_string()));
+                output
+            }
+            (Some(_), None) | (None, Some(_)) => unimplemented!(),
+            (Some(dim), Some(keepdim)) => {
+                let rdi = ReduceDimInput { dim, keepdim };
+                let output = self
+                    ._sum(Some(rdi))
+                    .map_err(|e| PyRuntimeError::new_err(e.to_string()));
+                output
+            }
+        }
+    }
+
     // PROCESSING OPS
     fn __matmul__(&self, other: &Tensor) -> PyResult<Tensor> {
         Ok(self.matmul(other)?)
@@ -314,13 +336,6 @@ fn log(x: Tensor) -> PyResult<Tensor> {
     x.log().map_err(|e| PyRuntimeError::new_err(e.to_string()))
 }
 
-#[pyfunction]
-fn sum(x: Tensor, dim: usize, keepdim: bool) -> PyResult<Tensor> {
-    x.sum(dim, keepdim)
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
-}
-
-/// A Python module implemented in Rust.
 #[pymodule]
 fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     // m.add_class::<Tensor>()?;
@@ -339,7 +354,6 @@ fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     pg_m.add_function(wrap_pyfunction!(tanh, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(exp, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(log, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(sum, pg_m)?)?;
 
     // nn.functional/nn
     let ff_m = PyModule::new(py, "functional")?;

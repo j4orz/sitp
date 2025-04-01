@@ -2,7 +2,7 @@ use crate::{
     Dtype, DtypeVal,
     ops::Op,
     tpy::{self},
-    trs::{Storage, Tensor, ViewOpError},
+    trs::{Storage, Tensor, ViewOpError, alloc},
 };
 use std::{
     cell::RefCell,
@@ -33,17 +33,17 @@ pub fn forward_cpu(op: &Op) -> Result<Tensor, OpForwardError> {
         Op::Sinh(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).sinh()), x),
         Op::Cosh(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).cosh()), x),
         Op::Tanh(x) => map_cpu(&op, |xi| DtypeVal::Float32(f32::from(xi).tanh()), x),
-        Op::Sum(x, dim, keepdim) => reduce_cpu(|xi, yi| xi + yi, x, *dim, *keepdim),
-        Op::Max(x, dim, keepdim) => reduce_cpu(
+        Op::Sum(x, rdi) => reduce_cpu(|xi, yi| xi + yi, x, rdi),
+        Op::Max(x, rdi) => reduce_cpu(
             // TODO: maybe_reduce_cpu where F: DTypeVal, DTypeVal -> Option<DTypeVal>?
+            // b/c of partialcmp.
             |xi, yi| match xi.partial_cmp(&yi).unwrap() {
                 cmp::Ordering::Less => yi,
                 cmp::Ordering::Equal => xi,
                 cmp::Ordering::Greater => xi,
             },
             x,
-            *dim,
-            *keepdim,
+            rdi,
         ),
         Op::Matmul(X, Y) => matmul_cpu(X, Y),
     }
@@ -137,42 +137,66 @@ where
     Ok(z)
 }
 
-fn reduce_cpu<F>(f: F, x: &Tensor, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError>
+#[derive(Clone)]
+pub struct ReduceDimInput {
+    pub dim: usize,
+    pub keepdim: bool,
+}
+
+fn reduce_cpu<F>(f: F, x: &Tensor, rdi: &Option<ReduceDimInput>) -> Result<Tensor, OpForwardError>
 where
     F: Fn(DtypeVal, DtypeVal) -> DtypeVal,
 {
     if x.ndim == 0 {
         return Ok(x.clone());
     }
-    let y_shape = x
-        .shape
-        .iter()
-        .enumerate()
-        .map(|(i, &dim_size)| if i == dim { 1 } else { dim_size })
-        .collect();
-    let mut y = tpy::zeros(y_shape, Dtype::Float32);
 
-    {
-        let (x_storage, mut y_storage) = (x.storage.borrow(), y.storage.borrow_mut());
-        for physy in 0..y.numel() {
-            // reconstructing logx from phsy by undoing reduce via logx[dim]=d
-            let mut logx = Tensor::encode(physy, &y.shape);
-            for d in 0..x.shape[dim] {
-                logx[dim] = d;
-                let physx = Tensor::decode(&logx, &x.stride);
+    match rdi {
+        None => {
+            let init = match x.dtype {
+                Dtype::Bool => DtypeVal::Bool(true),
+                Dtype::Float32 => DtypeVal::Float32(0.0),
+                Dtype::Float64 => DtypeVal::Float64(0.0),
+                Dtype::Int32 => DtypeVal::Int32(0),
+                Dtype::Int64 => DtypeVal::Int64(0),
+            };
+            let output_scalar = &x.storage.borrow().data.iter().fold(init, |acc, &x| acc + x);
+            let output_tensor = alloc(&vec![], vec![*output_scalar]);
+            Ok(output_tensor)
+        }
+        Some(rdi) => {
+            let (dim, keepdim) = (rdi.dim, rdi.keepdim);
+            let y_shape = x
+                .shape
+                .iter()
+                .enumerate()
+                .map(|(i, &dim_size)| if i == dim { 1 } else { dim_size })
+                .collect();
+            let mut y = tpy::zeros(y_shape, Dtype::Float32);
 
-                // y=y+x
-                y_storage.data[physy] = f(y_storage.data[physy], x_storage.data[physx]);
+            {
+                let (x_storage, mut y_storage) = (x.storage.borrow(), y.storage.borrow_mut());
+                for physy in 0..y.numel() {
+                    // reconstructing logx from phsy by undoing reduce via logx[dim]=d
+                    let mut logx = Tensor::encode(physy, &y.shape);
+                    for d in 0..x.shape[dim] {
+                        logx[dim] = d;
+                        let physx = Tensor::decode(&logx, &x.stride);
+
+                        // y=y+x
+                        y_storage.data[physy] = f(y_storage.data[physy], x_storage.data[physx]);
+                    }
+                }
             }
+
+            if !keepdim {
+                y.shape.remove(dim);
+                y.ndim -= 1;
+            }
+
+            Ok(y)
         }
     }
-
-    if !keepdim {
-        y.shape.remove(dim);
-        y.ndim -= 1;
-    }
-
-    Ok(y)
 }
 
 fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {

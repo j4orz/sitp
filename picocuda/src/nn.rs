@@ -1,8 +1,8 @@
 use std::ops::{Div, Sub};
 
-use pyo3::{PyResult, exceptions::PyRuntimeError, pyfunction};
+use pyo3::{PyResult, pyfunction};
 
-use crate::trs::Tensor;
+use crate::{ops::cpu_ops::ReduceDimInput, trs::Tensor};
 
 #[pyfunction]
 pub fn cross_entropy(p: Tensor, q: Tensor) -> PyResult<Tensor> {
@@ -13,7 +13,7 @@ pub fn cross_entropy(p: Tensor, q: Tensor) -> PyResult<Tensor> {
 pub fn _softmax(x: Tensor, dim: usize) -> PyResult<Tensor> {
     let shifted = x.sub(&x.max(dim, true)?)?;
     let exp = shifted.exp()?;
-    let expsum = exp.sum(dim, true)?;
+    let expsum = exp._sum(Some(ReduceDimInput { dim, keepdim: true }))?;
     let softmax = exp.div(&expsum)?;
     Ok(softmax)
 }

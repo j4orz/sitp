@@ -7,7 +7,7 @@ use crate::{
     tpy::{self, ones},
     trs::Tensor,
 };
-use cpu_ops::{OpForwardError, forward_cpu};
+use cpu_ops::{OpForwardError, ReduceDimInput, forward_cpu};
 // use cuda_ops::forward_cuda;
 use std::{
     collections::HashSet,
@@ -19,7 +19,7 @@ use std::{
 pub enum Op {
     Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binops (zip)
     Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // uops (map)
-    Sum(Tensor, usize, bool), Max(Tensor, usize, bool) // reduce
+    Sum(Tensor, Option<ReduceDimInput>), Max(Tensor, Option<ReduceDimInput>) // reduce
 }
 
 impl Op {
@@ -39,8 +39,8 @@ impl Op {
             => {
                 vec![x]
             }
-            Op::Sum(x, _, _) => vec![x],
-            Op::Max(x, _, _) => vec![x]
+            Op::Sum(x, _) => vec![x],
+            Op::Max(x, _) => vec![x]
         }
     }
 }
@@ -235,14 +235,15 @@ impl Tensor {
     }
 
     // ***reductions***
-    pub fn sum(&self, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
-        let op = Op::Sum(self.clone(), dim, keepdim);
+    pub fn _sum(&self, rdi: Option<ReduceDimInput>) -> Result<Tensor, OpForwardError> {
+        let op = Op::Sum(self.clone(), rdi);
         let output = self.forward(&op);
         output
     }
 
     pub fn max(&self, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
-        let op = Op::Max(self.clone(), dim, keepdim);
+        let rdi = ReduceDimInput { dim, keepdim };
+        let op = Op::Max(self.clone(), Some(rdi));
         let output = self.forward(&op);
         output
     }
