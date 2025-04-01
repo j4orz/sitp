@@ -287,7 +287,9 @@ impl Tensor {
     ) -> fmt::Result {
         match (shape, stride) {
             ([], []) => {
-                write!(fmt, "{:?}", self.storage.borrow().data[offset])?;
+                if offset < self.storage.borrow().data.len() {
+                    write!(fmt, "{:?}", self.storage.borrow().data[offset])?;
+                }
                 Ok(())
             }
             // basecase: indexed ndarray all the way through
@@ -307,7 +309,10 @@ impl Tensor {
                 write!(fmt, "]\n")?;
                 Ok(())
             }
-            _ => panic!(),
+            (foo, bar) => {
+                println!("moose: {:?}, {:?}", foo, bar);
+                panic!()
+            }
         }
     }
 
@@ -480,8 +485,9 @@ impl Tensor {
 
         let total = dist.iter().sum::<f32>();
         let mut output = Vec::with_capacity(samples);
+        let mut rng = rand::rng();
         for _ in 0..samples {
-            let u = rand::rng().sample(Uniform::new(0.0, total).unwrap());
+            let u = rng.sample(Uniform::new(0.0, total).unwrap());
             let (mut cumsum, mut index) = (0.0, 0);
             for (i, p) in dist.iter().enumerate() {
                 cumsum += p;

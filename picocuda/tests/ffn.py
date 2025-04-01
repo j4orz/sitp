@@ -138,12 +138,12 @@ for _ in range(1): # n samples
     for h in model:
       X = h(X)
     y_hat = F.softmax(X, dim=1)
-    print("softmax", y_hat)
-    # print("softmax summed", picograd.sum(y_hat,dim=0,keepdim=False))
+    # print("softmax", y_hat, y_hat.shape)
+    # print("softmax summed", y_hat.sum(dim=0,keepdim=False))
 
     # 3. sample
     token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
-    print("token sampled", token)
+    # print("token sampled", token)
     output.append(decode[token])
     # 4. autoregressively update
     context = context[1:] + [token]
