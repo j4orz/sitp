@@ -14,4 +14,3 @@ numpy = "0.23.0"
 pyo3 = { version = "0.23.3", features = ["multiple-pymethods"] }
 rand = "0.9.0"
 thiserror = "2.0.11"
-wgpu = "24.0.1"
