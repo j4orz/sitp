@@ -1,8 +1,6 @@
-use std::ops::{Div, Sub};
-
-use pyo3::{PyResult, pyfunction};
-
 use crate::{ops::cpu_ops::ReduceDimInput, trs::Tensor};
+use pyo3::{PyResult, pyfunction};
+use std::ops::{Div, Sub};
 
 #[pyfunction]
 pub fn cross_entropy(p: Tensor, q: Tensor) -> PyResult<Tensor> {

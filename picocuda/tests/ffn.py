@@ -12,8 +12,12 @@ E: embedding dimension (E != D in paper)
 D: model dimension
 """
 import picograd
-import torch # for .randint
+import torch
+import matplotlib.pyplot as plt
+# picograd = torch
+# %matplotlib inline
 # from jaxtyping import
+
 
 # *********************MODEL*********************
 B, T = 32, 3
@@ -21,7 +25,7 @@ V, E, D = 27, 10, 200
 
 class Linear:
   def __init__(self, D_in, D_out, bias=True):
-    self.W_DiDo = picograd.randn((D_in, D_out))
+    self.W_DiDo = picograd.randn((D_in, D_out)) * 0.01
     self.b_Do = picograd.zeros(D_out) if bias else None
 
   def __call__(self, X_Di):
@@ -57,6 +61,7 @@ print("model loaded to cpu")
 
 # *********************TRAINING LOOP*********************
 # 1. dataloader
+# import torch.nn.functional as F
 import picograd.nn.functional as F
 import random
 
@@ -73,7 +78,7 @@ def gen_dataset(words):
     for c in w + '.':
       X.append(context)
       Y.append(encode[c])
-      print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
+      # print(''.join(decode[i] for i in context), '-->', decode[encode[c]])
       context = context[1:] + [encode[c]]
 
   X, Y = picograd.tensor(X), picograd.tensor(Y) # X:(N,C) Y:(N)
@@ -83,7 +88,7 @@ def gen_dataset(words):
 # random.shuffle(words)
 # n1, n2 = int(0.8*len(words)), int(0.9*len(words))
 X_NT, Y_N = gen_dataset(words)#[:n1])
-print(X_NT.shape, Y_N.shape)
+# print(X_NT.shape, Y_N.shape)
 # Xdev, Ydev = gen_dataset(words[n1:n2])
 # Xte, Yte = gen_dataset(words[n2:])
 
@@ -125,27 +130,24 @@ print(X_NT.shape, Y_N.shape)
 # plt.plot(steps, losses)
 
 # *********************INFERENCE LOOP*********************
-for _ in range(1): # n samples
+for _ in range(20): # n samples
   output, context = [], [0] * T
   while True:
-    # 1. preprocessing
+    # 1. preprocessing: C_VE[X_1T]
+    # print("tokens", context)
     X_1T = picograd.tensor([context]) # B=1 for inference (1 response)
     X_1TE = C_VE[X_1T] # X_1T ∈ [0..=26] must hold
     X_1cTE = X_1TE.reshape((-1, T*E)) # reshape from 3dims -> 2dims B=1 TE
     X = X_1cTE
 
-    # 2. f: ℝ^d -> [0,1]^k
+    # 2. process: f: ℝ^d -> [0,1]^k
     for h in model:
       X = h(X)
     y_hat = F.softmax(X, dim=1)
-    # print("softmax", y_hat, y_hat.shape)
-    # print("softmax summed", y_hat.sum(dim=0,keepdim=False))
 
-    # 3. sample
+    # 3. postprocess: sample + update
     token = picograd.multinomial(y_hat, num_samples=1, replacement=True).item()#, generator=g).item()
-    # print("token sampled", token)
     output.append(decode[token])
-    # 4. autoregressively update
     context = context[1:] + [token]
     if token == 0:
         break

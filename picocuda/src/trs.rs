@@ -457,8 +457,9 @@ impl Tensor {
     // *************************************************************************
     pub fn randn(shape: &[usize]) -> Tensor {
         let n: usize = shape.iter().product::<usize>();
+        let mut rng = rand::rng();
         let data = (0..n)
-            .map(|_| DtypeVal::Float32(rand::rng().sample(StandardUniform)))
+            .map(|_| DtypeVal::Float32(rng.sample(Uniform::new(0.0, 1.0).unwrap())))
             .collect::<Vec<_>>();
         alloc(&shape, data)
     }
