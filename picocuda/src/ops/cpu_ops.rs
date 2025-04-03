@@ -1,7 +1,7 @@
 use crate::{
     Dtype, DtypeVal,
     ops::Op,
-    tpy::{self},
+    tpy,
     trs::{Storage, Tensor, ViewOpError, alloc},
 };
 use std::{
@@ -46,6 +46,27 @@ pub fn forward_cpu(op: &Op) -> Result<Tensor, OpForwardError> {
             rdi,
         ),
         Op::Matmul(X, Y) => matmul_cpu(X, Y),
+    }
+}
+
+pub fn backward_cpu(op: &Op, grad: &Tensor) -> Vec<Tensor> {
+    match op {
+        Op::Add(_x, _y) => vec![
+            (1.0 * &grad.clone()).unwrap(),
+            (1.0 * &grad.clone()).unwrap(),
+        ],
+        Op::Sub(x, y) => todo!(),
+        Op::Mul(x, y) => vec![(y * &grad.clone()).unwrap(), (x * &grad.clone()).unwrap()],
+        Op::Div(x, y) => todo!(),
+        Op::Matmul(x, y) => todo!(), // TODO:
+        Op::Neg(x) => todo!(),
+        Op::Exp(x) => todo!(),
+        Op::Log(x) => todo!(),
+        Op::Sinh(x) => todo!(),
+        Op::Cosh(x) => todo!(),
+        Op::Tanh(x) => todo!(),
+        Op::Sum(x, reduce_dim_input) => todo!(),
+        Op::Max(x, reduce_dim_input) => todo!(),
     }
 }
 

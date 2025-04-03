@@ -47,6 +47,31 @@ def verify_outputs(s, ytch, ypg, atol, rtol):
       raise AssertionError(f"{s} failed (shape={ytch.shape}) - {str(e)}") from None
 
 # ********************************************* TESTS **********************************************
+x_init = np.random.randn(1,3).astype(np.float32)
+W_init = np.random.randn(3,3).astype(np.float32)
+m_init = np.random.randn(1,3).astype(np.float32)
+
+class TestPicograd(unittest.TestCase):
+  def test_backward_pass(self):
+    def test_tinygrad():
+      x = picograd.tensor(x_init, requires_grad=True)
+      W = picograd.tensor(W_init, requires_grad=True)
+      out = x.matmul(W).tanh()
+      out = picograd.nn.functional.softmax(out, dim=1)
+      out.backward()
+      return out.numpy(), x.grad.numpy(), W.grad.numpy()
+
+    def test_pytorch():
+      x = torch.tensor(x_init, requires_grad=True)
+      W = torch.tensor(W_init, requires_grad=True)
+      out = x.matmul(W).tanh()
+      out = torch.nn.functional.softmax(out, dim=1)
+      out.backward()
+      return out.detach().numpy(), x.grad, W.grad
+
+  for ytch,ypg in zip(test_pytorch(), test_tinygrad()):
+    np.testing.assert_allclose(ytch, ypg, atol=1e-5)
+
 class TestViewOps(unittest.TestCase):
   def test_reshape(self):
     assrt([(4,3,6,6)], lambda x: x.reshape((12,6,6)))
