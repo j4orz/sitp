@@ -69,8 +69,8 @@ class TestPicograd(unittest.TestCase):
       out.backward()
       return out.detach().numpy(), x.grad, W.grad
 
-  for ytch,ypg in zip(test_pytorch(), test_tinygrad()):
-    np.testing.assert_allclose(ytch, ypg, atol=1e-5)
+    for ytch,ypg in zip(test_pytorch(), test_tinygrad()):
+      np.testing.assert_allclose(ytch, ypg, atol=1e-5)
 
 class TestViewOps(unittest.TestCase):
   def test_reshape(self):
@@ -88,8 +88,7 @@ class TestViewOps(unittest.TestCase):
     #   x.reshape([])
 
   def test_permute(self):
-    pass
-    # assrt([(4,3)], lambda x: x.permute((1,0)))
+    assrt([(4,3)], lambda x: x.permute((1,0)),  lambda x: x.permute((1,0)))
     # assrt([(4,3)], lambda x: x.permute((0,1)))
     # assrt([(1,2,3,4)], lambda x: x.permute((3,0,2,1)))
     # assrt([(3,4,5,6)], lambda x: x.permute((3,2,1,0)))
@@ -100,7 +99,9 @@ class TestViewOps(unittest.TestCase):
     # self.assrt_exception([(3,4,5,6)], lambda x: x.permute((0,0,1,2,3)), lambda x: x.permute((0,0,1,2,3)), expected=RuntimeError)
 
   def test_transpose(self):
-    pass
+    assrt([(3,3)], lambda x: x.T, lambda x: x.T())
+    # helper_test_op([(3,3,3)], lambda x: x.transpose(1,2))
+    # helper_test_op([(3,3,3)], lambda x: x.transpose(0,2))
 
   def test_getitem_embedding(self):
     B, T, V, E = 32, 3, 27, 10

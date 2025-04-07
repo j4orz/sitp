@@ -23,6 +23,7 @@ impl Tensor {
 
     pub fn backward(&self) -> () {
         self.storage.borrow_mut().grad = Some(ones(self.shape.clone()));
+        self._backward();
         for tensor in self.topo().iter().rev() {
             tensor._backward();
         }
@@ -41,7 +42,7 @@ impl Tensor {
         let dfdx_cached = storage_ref.grad.as_ref().unwrap();
 
         // evaluate local derivatives via chain rule
-        let local_grads = backward_cpu(&op, dfdx_cached);
+        let local_grads = backward_cpu(&op, &self, dfdx_cached);
 
         // propagate derivative to inputs assuming grads.len() == op.inputs().len()
         for (x, dfdx_next) in op.inputs().into_iter().zip(local_grads.iter()) {

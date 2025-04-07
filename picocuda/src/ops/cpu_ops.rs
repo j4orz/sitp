@@ -1,7 +1,7 @@
 use crate::{
     Dtype, DtypeVal,
     ops::Op,
-    tpy,
+    tpy::{self, ones},
     trs::{Storage, Tensor, ViewOpError, alloc},
 };
 use std::{
@@ -49,22 +49,32 @@ pub fn forward_cpu(op: &Op) -> Result<Tensor, OpForwardError> {
     }
 }
 
-pub fn backward_cpu(op: &Op, grad: &Tensor) -> Vec<Tensor> {
+// dFdx is the global derivative (backpropagated to the current op)
+// dfdx is the local derivative
+pub fn backward_cpu(op: &Op, opout: &Tensor, dFdx: &Tensor) -> Vec<Tensor> {
     match op {
         Op::Add(_x, _y) => vec![
-            (1.0 * &grad.clone()).unwrap(),
-            (1.0 * &grad.clone()).unwrap(),
+            (1.0 * &dFdx.clone()).unwrap(),
+            (1.0 * &dFdx.clone()).unwrap(),
         ],
         Op::Sub(x, y) => todo!(),
-        Op::Mul(x, y) => vec![(y * &grad.clone()).unwrap(), (x * &grad.clone()).unwrap()],
+        Op::Mul(x, y) => vec![(y * &dFdx.clone()).unwrap(), (x * &dFdx.clone()).unwrap()],
         Op::Div(x, y) => todo!(),
-        Op::Matmul(x, y) => todo!(), // TODO:
+        Op::Matmul(x, y) => todo!(),
         Op::Neg(x) => todo!(),
         Op::Exp(x) => todo!(),
         Op::Log(x) => todo!(),
         Op::Sinh(x) => todo!(),
         Op::Cosh(x) => todo!(),
-        Op::Tanh(x) => todo!(),
+        Op::Tanh(x) => {
+            // d(tanh)dx: 1-tanh(x)^2
+            let tanh_x = opout;
+            let (ones_tensor, tanh_squared) =
+                (ones(tanh_x.shape.clone()), (tanh_x * tanh_x).unwrap());
+            let dfdx = (&ones_tensor - &tanh_squared).unwrap();
+
+            vec![(&dfdx * &dFdx.clone()).unwrap()] // chain rule
+        }
         Op::Sum(x, reduce_dim_input) => todo!(),
         Op::Max(x, reduce_dim_input) => todo!(),
     }

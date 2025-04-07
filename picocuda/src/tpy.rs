@@ -79,15 +79,33 @@ fn decode_pyi(pyi: i32, n: usize) -> usize {
 impl Tensor {
     fn numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, numpy::PyArrayDyn<f32>>> {
         // todo: why does pytorch need to detatch first?
-        let data = self
-            .storage
-            .borrow()
-            .data
-            .iter()
-            .map(|&x| x.into())
-            .collect::<Vec<f32>>();
+        let num_elements = self.numel();
+        let mut data_vec = Vec::with_capacity(num_elements);
+        let mut logical_index = vec![0; self.ndim];
+        let storage_borrow = self.storage.borrow(); // Borrow outside the loop
 
-        let np_flat = data.into_pyarray(py).to_dyn().to_owned();
+        for _ in 0..num_elements {
+            // 1. Calculate physical index from logical index and stride
+            let physical_index = Self::decode(&logical_index, &self.stride);
+
+            // 2. Get data from storage at physical index
+            let value: f32 = storage_borrow.data[physical_index].into(); // Assuming .into() exists for DtypeVal -> f32
+            data_vec.push(value);
+
+            // 3. Increment logical index (like odometer)
+            for i in (0..self.ndim).rev() {
+                logical_index[i] += 1;
+                if logical_index[i] < self.shape[i] {
+                    // No carry-over needed
+                    break;
+                }
+                // Carry-over: reset current dimension index and continue to the next
+                logical_index[i] = 0;
+            }
+        }
+
+        // Convert the correctly ordered Vec to a NumPy array and reshape
+        let np_flat = data_vec.into_pyarray(py).to_dyn().to_owned();
         let np_shaped = np_flat.reshape(self.shape.clone())?;
         Ok(np_shaped)
     }
@@ -167,6 +185,15 @@ impl Tensor {
     fn permute(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
         let shape = shape.extract::<Vec<usize>>()?;
         Ok(self._permute(&shape))
+    }
+
+    // fn transpose(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
+    //     let shape = shape.extract::<Vec<usize>>()?;
+    //     Ok(self._transpose(&shape))
+    // }
+
+    fn T(&self) -> PyResult<Tensor> {
+        Ok(self._T())
     }
 
     #[pyo3(signature = (*args))]

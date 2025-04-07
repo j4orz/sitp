@@ -1,9 +1,6 @@
 use crate::{Device, Dtype, DtypeVal, Layout, ops::Op};
 use pyo3::prelude::*;
-use rand::{
-    Rng,
-    distr::{StandardUniform, Uniform},
-};
+use rand::{Rng, distr::Uniform};
 use std::{
     cell::RefCell,
     cmp::{Ordering, max},
@@ -109,7 +106,7 @@ pub enum ViewOpError {
 }
 
 // *****************************************************************************
-// *************************** CONSTRUCTORS (alloc) ***************************
+// *************************** CONSTRUCTORS (alloc) ****************************
 // *****************************************************************************
 
 pub fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
@@ -144,6 +141,10 @@ impl Tensor {
     // *************************************************************************
     // *************************** VIEWS (no alloc) ****************************
     // *************************************************************************
+
+    pub fn is_contiguous(&self) -> bool {
+        todo!()
+    }
 
     pub fn _view(&self, shape: &[usize], stride: &[usize]) -> Self {
         Self {
@@ -202,8 +203,26 @@ impl Tensor {
         Ok(self._view(&new_shape, &Self::shape_to_stride(&new_shape))) // TODO: alloc just to ref which allocs gain inside ._view?
     }
 
-    pub fn _permute(&self, indices: &[usize]) -> Self {
-        todo!()
+    // TODO: validate permutatation
+    pub fn _permute(&self, permuted_shape: &[usize]) -> Self {
+        let new_shape = permuted_shape
+            .iter()
+            .map(|&i| self.shape[i])
+            .collect::<Vec<_>>();
+        let new_stride = permuted_shape
+            .iter()
+            .map(|&i| self.stride[i])
+            .collect::<Vec<_>>();
+
+        self._view(&new_shape, &new_stride)
+    }
+
+    // pub fn _transpose(&self, indices: &[usize]) -> Self {
+    //     todo!()
+    // }
+
+    pub fn _T(&self) -> Self {
+        self._permute(&[1, 0])
     }
 
     pub fn _squeeze(&self, dim: &Vec<usize>) -> Self {
