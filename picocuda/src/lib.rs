@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 // frontend
+pub mod compiler;
 pub mod nn;
 pub mod storage;
 pub mod tpy;
