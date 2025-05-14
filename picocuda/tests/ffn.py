@@ -12,12 +12,11 @@ E: embedding dimension (E != D in paper)
 D: model dimension
 """
 import picograd
-import torch
+# import torch
 import matplotlib.pyplot as plt
 # picograd = torch
 # %matplotlib inline
 # from jaxtyping import
-
 
 # *********************MODEL*********************
 B, T = 32, 3
@@ -53,15 +52,13 @@ model = [
 ]
 
 C_VE = picograd.randn((V,E)) #, generator=g)
-# params = [C_VE] + [p for l in model for p in l.parameters()]
-# for p in params:
-#     p.requires_grad = True
+params = [C_VE] + [p for l in model for p in l.parameters()]
+for p in params:
+    p.requires_grad = True
 
 print("model loaded to cpu")
 
-# *********************TRAINING LOOP*********************
-# 1. dataloader
-# import torch.nn.functional as F
+# *********************DATA*********************
 import picograd.nn.functional as F
 import random
 
@@ -84,50 +81,50 @@ def gen_dataset(words):
   X, Y = picograd.tensor(X), picograd.tensor(Y) # X:(N,C) Y:(N)
   return X, Y
 
-# random.seed(42)
-# random.shuffle(words)
-# n1, n2 = int(0.8*len(words)), int(0.9*len(words))
+random.seed(42)
+random.shuffle(words)
+n1, n2 = int(0.8*len(words)), int(0.9*len(words))
 X_NT, Y_N = gen_dataset(words)#[:n1])
-# print(X_NT.shape, Y_N.shape)
-# Xdev, Ydev = gen_dataset(words[n1:n2])
-# Xte, Yte = gen_dataset(words[n2:])
+print(X_NT.shape, Y_N.shape)
+Xdev, Ydev = gen_dataset(words[n1:n2])
+Xte, Yte = gen_dataset(words[n2:])
 
-# 2. training loop
-# losses, steps = [], []
-# for step in range(100): #200000):
-#     # 1. forward
-#     # minibatch: X_NT -> X_BT
-#     i_B = picograd.randint(0, X_NT.shape[0], (B,))
-#     X_BT, Y_B = X_NT[i_B], Y_N[i_B]
+# *********************TRAINING LOOP*********************
+losses, steps = [], []
+for step in range(100): #200000):
+    # 1. forward
+    # minibatch: X_NT -> X_BT
+    i_B = picograd.randint(0, X_NT.shape[0], (B,))
+    X_BT, Y_B = X_NT[i_B], Y_N[i_B]
 
-#     # embed: X_BT -> X_BTE
-#     X_BTE = C_VE[X_BT] # embed the B examples with T tokens range that span [0..27]
-#                        # using 0..27 as indices into C_VE
-#     X_BcTE = X_BTE.view(-1, T * E) #. concat
-#     X = X_BcTE
+    # embed: X_BT -> X_BTE
+    X_BTE = C_VE[X_BT] # embed the B examples with T tokens range that span [0..27]
+                       # using 0..27 as indices into C_VE
+    X_BcTE = X_BTE.view(-1, T * E) #. concat
+    X = X_BcTE
 
-#     # X_BcTE -> X_BD -> X_BV (y_hat: logits)
-#     for h in model:
-#         X = h(X)
-#     loss = F.cross_entropy(X, Y_B) # 5. picograd.cross_entropy
+    # X_BcTE -> X_BD -> X_BV (y_hat: logits)
+    for h in model:
+        X = h(X)
+    loss = F.cross_entropy(X, Y_B) # 5. picograd.cross_entropy
 
-#     # 2. backward
-#     for layer in model:
-#         layer.out.retain_grad() # 6 .retain_grad()
-#     for p in params:
-#         p.grad = None
-#     loss.backward()
+    # 2. backward
+    for layer in model:
+        layer.out.retain_grad() # 6 .retain_grad()
+    for p in params:
+        p.grad = None
+    loss.backward()
 
-#     # 3. update
-#     for p in params:
-#         p.data += -0.01 * p.grad
+    # 3. update
+    for p in params:
+        p.data += -0.01 * p.grad
 
-#     steps.append(step)
-#     losses.append(loss.log10().item())
-#     if step % 10000 == 0:
-#         print(f"step: {step}/{200000}, loss {loss.item()}")
+    steps.append(step)
+    losses.append(loss.log10().item())
+    if step % 10000 == 0:
+        print(f"step: {step}/{200000}, loss {loss.item()}")
 
-# plt.plot(steps, losses)
+plt.plot(steps, losses)
 
 # *********************INFERENCE LOOP*********************
 for _ in range(20): # n samples

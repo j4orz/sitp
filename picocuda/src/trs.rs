@@ -22,6 +22,7 @@ use thiserror::Error;
 // - INDEXING (internal): shape_to_stride, encode, decode
 // - BROADCASTING: broadcast_shape, clamp_stride, broadcast_logidx
 // - SAMPLING: randn
+// - AUTODIFF: toposort, backward
 
 // NB:
 // - unsendable: does pytorch user code multithread tensors?

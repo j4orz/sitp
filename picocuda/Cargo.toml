@@ -10,7 +10,6 @@ path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cudarc = "0.16.4"
 numpy = "0.23.0"
 opencl3 = "0.12.0"
 pyo3 = { version = "0.23.3", features = ["multiple-pymethods"] }

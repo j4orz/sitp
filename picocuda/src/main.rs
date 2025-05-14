@@ -9,8 +9,7 @@ fn main() {
     ⠀⠀⣼⣆⠀⠀⠀⠀⣰⣧⠀⠀
     ⠀⣼⣿⣿⣆⠀⠀⣰⣿⣿⣧⠀
     ⠾⠟⠿⠿⠿⠧⠼⠿⠿⠿⠻⠷
-    picograd: torch.tensor->CUDA compiler
-    ⚠︎ this is a one man effort to compile llama and r1. beware of dragons ⚠︎
+    picograd: tensor->triton
     "
     );
 
