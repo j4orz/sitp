@@ -106,7 +106,7 @@ for step in range(100): #200000):
     # X_BcTE -> X_BD -> X_BV (y_hat: logits)
     for h in model:
         X = h(X)
-    loss = F.cross_entropy(X, Y_B) # 5. picograd.cross_entropy
+    loss = F.cross_entropy(X, Y_B)
 
     # 2. backward
     for layer in model:

@@ -66,8 +66,8 @@ impl Tensor {
 
     fn _backward(&self) -> () {
         // NB: autodifferentiation's .backward() is defined on Ops, not Tensors.
-        // since the gradient gives us the perturbation sensitivty a function's
-        // input has on the final loss, it would be clearer mathematically if
+        // since the gradient gives us the perturbation sensitivty that a
+        // function's input has on the final loss, it would be clearer mathematically if
         // .grad lived on Op, not Tensor.
         if self.input_op.is_none() { return }
         let op = self.input_op.as_ref().unwrap();

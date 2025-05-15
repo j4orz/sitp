@@ -475,6 +475,18 @@ impl Tensor {
     // *************************************************************************
     // ******************************** RANDOM *********************************
     // *************************************************************************
+    pub fn randint(low: i32, high: i32, shape: &[usize]) -> Self {
+        let mut rng = rand::rng();
+        let dist = Uniform::new(low, high).unwrap();
+        let n = shape.iter().product::<usize>();
+
+        let data = (0..n)
+            .map(|_| DtypeVal::Int32(rng.sample(dist)))
+            .collect::<Vec<_>>();
+
+        alloc(&shape, data)
+    }
+
     pub fn randn(shape: &[usize]) -> Tensor {
         let n: usize = shape.iter().product::<usize>();
         let mut rng = rand::rng();

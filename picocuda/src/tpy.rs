@@ -43,6 +43,11 @@ pub fn ones(shape: Vec<usize>) -> Tensor {
 }
 
 #[pyfunction]
+pub fn randint(low: i32, high: i32, shape: Vec<usize>) -> Tensor {
+    Tensor::randint(low, high, &shape)
+}
+
+#[pyfunction]
 pub fn randn(shape: Vec<usize>) -> Tensor {
     Tensor::randn(&shape)
 }
@@ -371,6 +376,7 @@ fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
     pg_m.add_function(wrap_pyfunction!(tensor, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(zeros, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(ones, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(randint, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(randn, pg_m)?)?;
     pg_m.add_function(wrap_pyfunction!(arange, pg_m)?)?;
 
