@@ -1,14 +1,10 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+#![feature(assert_matches)]
+pub mod generator;
+pub mod optimizer;
+pub mod parser;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[derive(Debug)]
+pub enum InstrNode {
+    Start, Ret(Box<InstrNode>, Box<InstrNode>),
+    Lit(i32), Add(Box<InstrNode>, Box<InstrNode>), Sub(Box<InstrNode>, Box<InstrNode>), Mul(Box<InstrNode>, Box<InstrNode>), Div(Box<InstrNode>, Box<InstrNode>)
 }
