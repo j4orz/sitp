@@ -1,3 +1,4 @@
-int main() {
-  return 88-32;
+int main()
+{
+    return 88 - 32;
 }

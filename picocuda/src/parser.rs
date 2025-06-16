@@ -1,30 +1,10 @@
-
-use std::io;
-use std::iter;
-
-use crate::{
-    InstrNode, //rep::{ctl::{Branch, Return, Start}, data::{Add, Div, Int, Mul, Sub}, scope::{Scope, ScopeError, ARG, CTRL}, MultiInstr, Proj, TypeAndVal}
-};
+use std::{io, iter};
+use crate::{optimizer::Type, NodeDef, Node, OpCode};
 use thiserror::Error;
 
-// NB1. each function in the parser will parse in two ways
-//        a. conditionally (SUM/OR): match tokens(first, rest) first.typ { TT::Foo => {}, TT::Bar => {}, TT::Baz => {} }
-//        b. assertively (PROD/AND): require(tokens, TT:Foo), eat(tokens, TT:Bar), eat(tokens, TT:Baz)
-
-// NB2. the parser is composed of pure functions less the start instruction and
-//      scope/nv instruction so the token stream (r) is threaded throughout
-
-// NB3. generally speaking there are three variants for intermediate representation
-//        a. tree ("AST")
-//           -> precedence is represented via tree's hierarchy.
-//        b. two-tiered (nested) graph of basic blocks of instructions. ("CFG+BB")
-//           -> edges denote ONLY control flow
-//        c. single-tiered (flat) graph of instructions ("SoN")
-//           -> edges denote control flow OR data flow
-
-//      picoc parses the concrete syntax into (c) because TODO. see optimizer
-//      for more details. this means that the total ordering of straightline
-//      code (vec<list>) is relaxed to a partial order of a graph
+thread_local! {
+    pub static START: NodeDef = Node::new(OpCode::Start)
+}
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -34,192 +14,181 @@ pub enum ParseError {
     Mismatch { expected: String, actual: String },
 }
 
-pub struct Parser {
-    // pub start: InstrNode,
-} // scope: Rc<Scope> }
-impl Parser {
-    pub fn new() -> Self {
-        Self {
-            // start: InstrNode::Start,
-        }
-    } // scope: Rc::new(Scope::new()) }}
+// NB. each function in the parser will parse in two ways
+//     a. conditionally (SUM/OR): match tokens(first, rest) first.typ { TT::Foo => {}, TT::Bar => {}, TT::Baz => {} }
+//     b. assertively (PROD/AND): require(tokens, TT:Foo), eat(tokens, TT:Bar), eat(tokens, TT:Baz)
+pub fn parse(tokens: &[Token]) -> Result<NodeDef, ParseError> {
+    let r = tokens;
+    let (_, r) = require(r, TT::KeywordInt)?;
+    let (_, r) = require(r, TT::Alias)?;
+    let (_, r) = require(r, TT::PuncLeftParen)?;
+    let (_, r) = require(r, TT::PuncRightParen)?;
 
-    pub fn parse_prg(&mut self, tokens: &[Token]) -> Result<InstrNode, ParseError> {
-        let r = tokens;
-        let (_, r) = require(r, TT::KeywordInt)?;
-        let (_, r) = require(r, TT::Alias)?;
-        let (_, r) = require(r, TT::PuncLeftParen)?;
-        let (_, r) = require(r, TT::PuncRightParen)?;
+    let (_, r) = require(r, TT::PuncLeftBrace)?;
+    // scope.push_nv();
+    // scope.write(CTRL.to_owned(), Proj::new(*START.clone(), 0));
+    // scope.write(ARG.to_owned(), Proj::new(*START.clone(), 1));
+    let (block, r) = parse_block(r)?;
+    // scope.pop_nv();
 
-        let (_, r) = require(r, TT::PuncLeftBrace)?;
-        // self.scope.push_nv();
-        // self.scope.write(CTRL.to_owned(), Proj::new(self.start.clone(), 0));
-        // self.scope.write(ARG.to_owned(), Proj::new(self.start.clone(), 1));
-        let (block, r) = self.parse_block(r)?;
-        // self.scope.pop_nv();
+    let (_, r) = require(r, TT::PuncRightBrace)?;
+    // try_convert block's Rc<dyn Instr> -> Rc<Return>
 
-        let (_, r) = require(r, TT::PuncRightBrace)?;
-        // try_convert block's Rc<dyn Instr> -> Rc<Return>
+    if r.is_empty() { Ok(block) } else { Err(ParseError::Mismatch { expected: "empty token stream".to_string(), actual: format!("{:?}", r) }) }
+}
 
-        if r.is_empty() {
-            Ok(block)
-        } else {
-            Err(ParseError::Mismatch {
-                expected: "empty token stream".to_string(),
-                actual: format!("{:?}", r),
-            })
-        }
+// NB: lexical scope ==> nv's are only pushed/popped in parse_block
+fn parse_block<'a>(tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    // scope.push_nv();
+    let (mut output, mut r) = (None, tokens);
+    while let Ok((stmt, _r)) = parse_stmt(r) {
+        output = Some(stmt);
+        r = _r;
     }
+    // scope.push_nv();
+    Ok((output.unwrap(), r))
+}
 
-    // NB: lexical scope ==> nv's are only pushed/popped in parse_block
-    fn parse_block<'a>(
-        &mut self,
-        tokens: &'a [Token],
-    ) -> Result<(InstrNode, &'a [Token]), ParseError> {
-        // self.scope.push_nv();
-        let (mut output, mut r) = (None, tokens);
-        while let Ok((stmt, _r)) = self.parse_stmt(r) {
-            output = Some(stmt);
-            r = _r;
-        }
-        // self.scope.push_nv();
-        Ok((output.unwrap(), r))
-    }
+fn parse_stmt<'a>(tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    match tokens {
+        [] => Err(ParseError::Mismatch {
+            expected: "expected: {:?} got an empty token stream".to_string(),
+            actual: "".to_string(),
+        }),
+        [f, r @ ..] => match f.typ {
+            TT::KeywordInt => {
+                let (_alias, r) = require(r, TT::Alias)?;
+                let (_, r) = require(r, TT::Equals)?;
+                let (expr, r) = parse_expr(r)?;
+                let (_, r) = require(r, TT::PuncSemiColon)?;
 
-    fn parse_stmt<'a>(
-        &mut self,
-        tokens: &'a [Token],
-    ) -> Result<(InstrNode, &'a [Token]), ParseError> {
-        match tokens {
-            [] => Err(ParseError::Mismatch {
-                expected: "expected: {:?} got an empty token stream".to_string(),
-                actual: "".to_string(),
+                // let _ = scope.write(alias.lexeme.to_owned(), expr.clone())?;
+                Ok((expr, r))
+            }
+            // TT::KeywordIf => {
+            //     let (pred, r) = parse_expr(r)?;
+
+            //     let branch = Branch::new(scope.read_ctrl(), pred);
+            //     let left = Proj::new(branch.clone(), 0).peephole(*START.clone());
+            //     let right = Proj::new(branch, 1).peephole(*START.clone());
+            //     let scope_og = Rc::new((*scope).clone()); // TODO: need ascii debugger here to verify
+
+            //     // NB: because condtionals are statements and not expressions
+            //     //     in C, the return of parse_stmts are not bound and ignored
+
+            //     scope.write_ctrl(left); // 1. set ctrl
+            //     let (_, r) = parse_stmt(r)?; // 2. parse
+            //     let scope_left = Rc::new((*scope).clone()); // 3. alias scope
+
+            //     scope = scope_og; // reset
+
+            //     scope.write_ctrl(right); // 1. set ctrl
+            //     if r.len() > 1 && r[0].typ == TT::KeywordEls { let (_, r) = parse_stmt(r)?; }; // 2. parse
+            //     let scope_right = Rc::new((*scope).clone()); // 3. alias scope
+
+            //     let region = scope_left.merge(&scope_right);
+            //     scope.write_ctrl(region.clone());
+            //     Ok((region, r))
+            // },
+            TT::KeywordRet => {
+                let (expr, r) = parse_expr(r)?;
+                let (_, r) = require(r, TT::PuncSemiColon)?;
+                let start = START.with(|s| s.clone());
+                let ret = Node::new(OpCode::Ret);
+                let _ = Node::add_input(&ret, start);
+                let _ = Node::add_input(&ret, expr);
+
+                Ok((ret, r))
+            }
+            t => Err(ParseError::Mismatch {
+                expected: format!("expected: {:?} got: {:?}", TT::KeywordRet, t),
+                actual: f.lexeme.to_owned(),
             }),
-            [f, r @ ..] => match f.typ {
-                TT::KeywordInt => {
-                    let (_alias, r) = require(r, TT::Alias)?;
-                    let (_, r) = require(r, TT::Equals)?;
-                    let (expr, r) = self.parse_expr(r)?;
-                    let (_, r) = require(r, TT::PuncSemiColon)?;
-
-                    // let _ = self.scope.write(alias.lexeme.to_owned(), expr.clone())?;
-                    Ok((expr, r))
-                }
-                // TT::KeywordIf => {
-                //     let (pred, r) = self.parse_expr(r)?;
-
-                //     let branch = Branch::new(self.scope.read_ctrl(), pred);
-                //     let left = Proj::new(branch.clone(), 0).peephole(self.start.clone());
-                //     let right = Proj::new(branch, 1).peephole(self.start.clone());
-                //     let scope_og = Rc::new((*self.scope).clone()); // TODO: need ascii debugger here to verify
-
-                //     // NB: because condtionals are statements and not expressions
-                //     //     in C, the return of parse_stmts are not bound and ignored
-
-                //     self.scope.write_ctrl(left); // 1. set ctrl
-                //     let (_, r) = self.parse_stmt(r)?; // 2. parse
-                //     let scope_left = Rc::new((*self.scope).clone()); // 3. alias scope
-
-                //     self.scope = scope_og; // reset
-
-                //     self.scope.write_ctrl(right); // 1. set ctrl
-                //     if r.len() > 1 && r[0].typ == TT::KeywordEls { let (_, r) = self.parse_stmt(r)?; }; // 2. parse
-                //     let scope_right = Rc::new((*self.scope).clone()); // 3. alias scope
-
-                //     let region = scope_left.merge(&scope_right);
-                //     self.scope.write_ctrl(region.clone());
-                //     Ok((region, r))
-                // },
-                TT::KeywordRet => {
-                    let (expr, r) = self.parse_expr(r)?;
-                    let (_, r) = require(r, TT::PuncSemiColon)?;
-                    // let retinstr = Return::new(self.start.clone(), expr);
-                    let retinstr = InstrNode::Ret(Box::new(InstrNode::Start), Box::new(expr));
-                    Ok((retinstr, r))
-                }
-                t => Err(ParseError::Mismatch {
-                    expected: format!("expected: {:?} got: {:?}", TT::KeywordRet, t),
-                    actual: f.lexeme.to_owned(),
-                }),
-            },
-        }
+        },
     }
+}
 
-    fn parse_expr<'a>(&self, tokens: &'a [Token]) -> Result<(InstrNode, &'a [Token]), ParseError> {
-        self.parse_term(tokens)
+fn parse_expr<'a>(tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    parse_term(tokens)
+}
+
+fn parse_term<'a>(tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    let (x, r) = parse_factor(tokens)?;
+
+    match r {
+        [] => panic!(),
+        [f, _r @ ..] => match f.typ {
+            TT::Plus => {
+                let (y, r) = parse_factor(_r)?;
+                let add = Node::new(OpCode::Add);
+                let _ = Node::add_input(&add, x);
+                let _ = Node::add_input(&add, y);
+                
+                Ok((add.peephole(), r))
+            }
+            TT::Minus => {
+                let (y, r) = parse_factor(_r)?;
+                let sub = Node::new(OpCode::Sub);
+                let _ = Node::add_input(&sub, x);
+                let _ = Node::add_input(&sub, y);
+                
+                Ok((sub.peephole(), r))
+            }
+            _ => Ok((x, r)),
+        },
     }
+}
 
-    fn parse_term<'a>(&self, tokens: &'a [Token]) -> Result<(InstrNode, &'a [Token]), ParseError> {
-        let (x, r) = self.parse_factor(tokens)?;
+fn parse_factor<'a>(tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    let (x, r) = parse_atom(tokens)?;
 
-        match r {
-            [] => panic!(),
-            [f, _r @ ..] => match f.typ {
-                TT::Plus => {
-                    let (y, r) = self.parse_factor(_r)?;
-                    // Ok((Add::new(x, y).peephole(self.start.clone()), r))
-                    Ok((InstrNode::Add(Box::new(x), Box::new(y)), r))
-                }
-                TT::Minus => {
-                    let (y, r) = self.parse_factor(_r)?;
-                    // Ok((Sub::new(x, y), r))
-                    Ok((InstrNode::Sub(Box::new(x), Box::new(y)), r))
-                }
-                _ => Ok((x, r)),
-            },
-        }
+    match r {
+        [] => panic!(),
+        [f, _r @ ..] => match f.typ {
+            TT::Star => {
+                let (y, r) = parse_atom(_r)?;
+                let mul = Node::new(OpCode::Mul);
+                let _ = Node::add_input(&mul, x);
+                let _ = Node::add_input(&mul, y);
+                
+                Ok((mul.peephole(), r))
+            }
+            TT::Slash => {
+                let (y, r) = parse_atom(_r)?;
+                let div = Node::new(OpCode::Div);
+                let _ = Node::add_input(&div, x);
+                let _ = Node::add_input(&div, y);
+                
+                Ok((div.peephole(), r))
+            }
+            _ => Ok((x, r)),
+        },
     }
+}
 
-    fn parse_factor<'a>(
-        &self,
-        tokens: &'a [Token],
-    ) -> Result<(InstrNode, &'a [Token]), ParseError> {
-        let (x, r) = self.parse_atom(tokens)?;
-
-        match r {
-            [] => panic!(),
-            [f, _r @ ..] => match f.typ {
-                TT::Star => {
-                    let (y, r) = self.parse_atom(_r)?;
-                    // Ok((Mul::new(x, y), r))
-                    Ok((InstrNode::Mul(Box::new(x), Box::new(y)), r))
-                }
-                TT::Slash => {
-                    let (y, r) = self.parse_atom(_r)?;
-                    // Ok((Div::new(x, y), r))
-                    Ok((InstrNode::Div(Box::new(x), Box::new(y)), r))
-                }
-                _ => Ok((x, r)),
-            },
-        }
-    }
-
-    fn parse_atom<'a>(&self, tokens: &'a [Token]) -> Result<(InstrNode, &'a [Token]), ParseError> {
-        match tokens {
-            [] => Err(ParseError::Mismatch {
-                expected: "expected: {:?} got an empty token stream".to_string(),
-                actual: "".to_string(),
+fn parse_atom<'a>(tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    match tokens {
+        [] => Err(ParseError::Mismatch {
+            expected: "expected: {:?} got an empty token stream".to_string(),
+            actual: "".to_string(),
+        }),
+        [f, r @ ..] => match f.typ {
+            TT::LiteralInt => {
+                let start = START.with(|s| s.clone());
+                let lit = Node::new_constant(OpCode::Con, Type::Int(f.lexeme.parse().unwrap()));
+                let _ = Node::add_input(&lit, start);
+                
+                Ok((lit.peephole(), r))
+            }
+            // TT::Alias => {
+            //     let expr = scope.read(f.lexeme.to_owned())?;
+            //     Ok((expr,r))
+            // },
+            t => Err(ParseError::Mismatch {
+                expected: format!("expected: {:?} got: {:?}", TT::LiteralInt, t),
+                actual: f.lexeme.to_owned(),
             }),
-            [f, r @ ..] => match f.typ {
-                TT::LiteralInt => {
-                    // let constantinstr = Int::new(
-                    //     self.start.clone(),
-                    //     TypeAndVal::Int(f.lexeme.parse().unwrap()),
-                    // );
-
-                    // Ok((constantinstr, r))
-                    Ok((InstrNode::Lit(f.lexeme.parse().unwrap()), r))
-                }
-                // TT::Alias => {
-                //     let expr = self.scope.read(f.lexeme.to_owned())?;
-                //     Ok((expr,r))
-                // },
-                t => Err(ParseError::Mismatch {
-                    expected: format!("expected: {:?} got: {:?}", TT::LiteralInt, t),
-                    actual: f.lexeme.to_owned(),
-                }),
-            },
-        }
+        },
     }
 }
 
@@ -244,7 +213,7 @@ fn require(tokens: &[Token], tt: TT) -> Result<(&Token, &[Token]), ParseError> {
 
 #[cfg(test)]
 mod parse_arith {
-    use crate::{parser::{lex, Parser}, InstrNode};
+    use crate::{parser::{lex, parse}, OpCode};
     use std::{assert_matches::assert_matches, fs};
     
     const TEST_DIR: &str = "tests/arith";
@@ -258,16 +227,72 @@ mod parse_arith {
             .collect::<Vec<_>>();
     
         let tokens = lex(&chars).unwrap();
-        // let mut parser = super::Parser::new(Start::new(vec![Box::new(TypeAndVal::Bot)]));
-        let mut parser = Parser::new();
-        let graph = parser.parse_prg(&tokens).unwrap();
-        assert_matches!(graph, InstrNode::Ret(ref boxed, _) if matches!(**boxed, InstrNode::Start));
+        let graph = parse(&tokens).unwrap();
+
+        assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
         insta::assert_debug_snapshot!(graph, @r###"
-        Ret(
-            Start,
-            Lit(
-                8,
-            ),
+        NodeDef(
+            RefCell {
+                value: Node {
+                    opcode: Ret,
+                    typ: Bot,
+                    defs: [
+                        NodeDef(
+                            RefCell {
+                                value: Node {
+                                    opcode: Start,
+                                    typ: Bot,
+                                    defs: [],
+                                    uses: [
+                                        NodeUse(
+                                            (Weak),
+                                        ),
+                                        NodeUse(
+                                            (Weak),
+                                        ),
+                                    ],
+                                },
+                            },
+                        ),
+                        NodeDef(
+                            RefCell {
+                                value: Node {
+                                    opcode: Con,
+                                    typ: Int(
+                                        8,
+                                    ),
+                                    defs: [
+                                        NodeDef(
+                                            RefCell {
+                                                value: Node {
+                                                    opcode: Start,
+                                                    typ: Bot,
+                                                    defs: [],
+                                                    uses: [
+                                                        NodeUse(
+                                                            (Weak),
+                                                        ),
+                                                        NodeUse(
+                                                            (Weak),
+                                                        ),
+                                                    ],
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    uses: [
+                                        NodeUse(
+                                            (Weak),
+                                        ),
+                                    ],
+                                },
+                            },
+                        ),
+                    ],
+                    uses: [],
+                },
+            },
         )
         "###);
     }
@@ -628,9 +653,9 @@ mod lex_arith {
     }
 
     #[test]
-    fn add_multi() {
+    fn add_compound() {
         #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/add_multi.c"))
+        let input = fs::read(format!("{TEST_DIR}/add_compound.c"))
             .expect("file dne")
             .iter()
             .map(|b| *b as char)
@@ -756,9 +781,9 @@ mod lex_arith {
     }
 
     #[test]
-    fn mult() {
+    fn mul() {
         #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/mult.c"))
+        let input = fs::read(format!("{TEST_DIR}/mul.c"))
             .expect("file dne")
             .iter()
             .map(|b| *b as char)
