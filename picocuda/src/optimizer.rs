@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::{parser, NodeDef, Node, OpCode};
 
 // types form a symmetric complete bounded (ranked) lattice
@@ -33,18 +35,20 @@ impl NodeDef {
                 true => {
                     let start = parser::START.with(|s| s.clone());
                     let con = Node::new_constant( OpCode::Con, self.borrow().typ);
-                    let _ = Node::add_input(&con, start);
+                    let _ = con.add_def(&start);
                     Some(con)
                 },
                 false => { None },
             }
         };
 
-        peepholed.unwrap_or(self)
-    } // NB1: self is Drop
-      // NB2: edge maintenance with weak references on the children of the
-      //      dropped node are left for now which can be cleared eagerly
-      //      (from parent's dealloc) or lazily (on child's processing) in the future
+        // NB: explicit mem::drop over implicit ops::Drop::drop for the purpose of
+        //     invariant assertion: this node (and it's edges) SHOULD be droppable.
+        match peepholed {
+            Some(peeped) => { mem::drop(self); peeped },
+            None => self,
+        }
+    }
 
     // see: https://en.wikipedia.org/wiki/Partial_evaluation
     fn eval_type(&self) -> Type {
@@ -67,6 +71,7 @@ impl NodeDef {
 
                 evald_type
             },
+            _ => unimplemented!()
         }
     }
 
@@ -77,7 +82,7 @@ impl NodeDef {
 
 #[cfg(test)]
 mod peephole {
-    use crate::{parser::{lex, parse}, OpCode};
+    use crate::{parser::{lex, Parser}, OpCode};
     use std::{assert_matches::assert_matches, fs};
     
     const TEST_DIR: &str = "tests/arith";
@@ -90,87 +95,13 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
+        let mut parser = Parser::new();
         let tokens = lex(&chars).unwrap();
-        let graph = parse(&tokens).unwrap();
+        let graph = parser.parse(&tokens).unwrap();
 
         assert_matches!(graph.borrow().opcode, OpCode::Ret);
         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-        insta::assert_debug_snapshot!(graph, @r###"
-        NodeDef(
-            RefCell {
-                value: Node {
-                    opcode: Ret,
-                    typ: Bot,
-                    defs: [
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Start,
-                                    typ: Bot,
-                                    defs: [],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Con,
-                                    typ: Int(
-                                        19,
-                                    ),
-                                    defs: [
-                                        NodeDef(
-                                            RefCell {
-                                                value: Node {
-                                                    opcode: Start,
-                                                    typ: Bot,
-                                                    defs: [],
-                                                    uses: [
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                    ],
-                                                },
-                                            },
-                                        ),
-                                    ],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                    ],
-                    uses: [],
-                },
-            },
-        )
-        "###);
+        insta::assert_debug_snapshot!(graph);
     }
 
     #[test]
@@ -181,87 +112,13 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
+        let mut parser = Parser::new();
         let tokens = lex(&chars).unwrap();
-        let graph = parse(&tokens).unwrap();
+        let graph = parser.parse(&tokens).unwrap();
 
         assert_matches!(graph.borrow().opcode, OpCode::Ret);
         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-        insta::assert_debug_snapshot!(graph, @r###"
-        NodeDef(
-            RefCell {
-                value: Node {
-                    opcode: Ret,
-                    typ: Bot,
-                    defs: [
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Start,
-                                    typ: Bot,
-                                    defs: [],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Con,
-                                    typ: Int(
-                                        56,
-                                    ),
-                                    defs: [
-                                        NodeDef(
-                                            RefCell {
-                                                value: Node {
-                                                    opcode: Start,
-                                                    typ: Bot,
-                                                    defs: [],
-                                                    uses: [
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                    ],
-                                                },
-                                            },
-                                        ),
-                                    ],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                    ],
-                    uses: [],
-                },
-            },
-        )
-        "###);
+        insta::assert_debug_snapshot!(graph);
     }
 
     #[test]
@@ -272,87 +129,13 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
+        let mut parser = Parser::new();
         let tokens = lex(&chars).unwrap();
-        let graph = parse(&tokens).unwrap();
+        let graph = parser.parse(&tokens).unwrap();
 
         assert_matches!(graph.borrow().opcode, OpCode::Ret);
         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-        insta::assert_debug_snapshot!(graph, @r###"
-        NodeDef(
-            RefCell {
-                value: Node {
-                    opcode: Ret,
-                    typ: Bot,
-                    defs: [
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Start,
-                                    typ: Bot,
-                                    defs: [],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Con,
-                                    typ: Int(
-                                        90,
-                                    ),
-                                    defs: [
-                                        NodeDef(
-                                            RefCell {
-                                                value: Node {
-                                                    opcode: Start,
-                                                    typ: Bot,
-                                                    defs: [],
-                                                    uses: [
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                    ],
-                                                },
-                                            },
-                                        ),
-                                    ],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                    ],
-                    uses: [],
-                },
-            },
-        )
-        "###);
+        insta::assert_debug_snapshot!(graph);
     }
 
     #[test]
@@ -363,102 +146,29 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
+        let mut parser = Parser::new();
         let tokens = lex(&chars).unwrap();
-        let graph = parse(&tokens).unwrap();
+        let graph = parser.parse(&tokens).unwrap();
 
         assert_matches!(graph.borrow().opcode, OpCode::Ret);
         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-        insta::assert_debug_snapshot!(graph, @r###"
-        NodeDef(
-            RefCell {
-                value: Node {
-                    opcode: Ret,
-                    typ: Bot,
-                    defs: [
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Start,
-                                    typ: Bot,
-                                    defs: [],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                        NodeDef(
-                            RefCell {
-                                value: Node {
-                                    opcode: Con,
-                                    typ: Int(
-                                        11,
-                                    ),
-                                    defs: [
-                                        NodeDef(
-                                            RefCell {
-                                                value: Node {
-                                                    opcode: Start,
-                                                    typ: Bot,
-                                                    defs: [],
-                                                    uses: [
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                        NodeUse(
-                                                            (Weak),
-                                                        ),
-                                                    ],
-                                                },
-                                            },
-                                        ),
-                                    ],
-                                    uses: [
-                                        NodeUse(
-                                            (Weak),
-                                        ),
-                                    ],
-                                },
-                            },
-                        ),
-                    ],
-                    uses: [],
-                },
-            },
-        )
-        "###);
+        insta::assert_debug_snapshot!(graph);
     }
 
-    // #[test]
-    // fn add_compound() {
-    //     let chars = fs::read(format!("{TEST_DIR}/add_compound.c"))
-    //         .expect("file dne")
-    //         .iter()
-    //         .map(|b| *b as char)
-    //         .collect::<Vec<_>>();
+    #[test]
+    fn add_compound() {
+        let chars = fs::read(format!("{TEST_DIR}/add_compound.c"))
+            .expect("file dne")
+            .iter()
+            .map(|b| *b as char)
+            .collect::<Vec<_>>();
     
-    //     let tokens = lex(&chars).unwrap();
-    //     let graph = parse(&tokens).unwrap();
+        let mut parser = Parser::new();
+        let tokens = lex(&chars).unwrap();
+        let graph = parser.parse(&tokens).unwrap();
 
-    //     assert_matches!(graph.borrow().opcode, OpCode::Ret);
-    //     assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-    //     insta::assert_debug_snapshot!(graph, @r###""###);
-    // }
+        assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        insta::assert_debug_snapshot!(graph);
+    }
 }

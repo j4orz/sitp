@@ -1,0 +1,78 @@
+---
+source: src/optimizer.rs
+expression: graph
+---
+NodeDef(
+    RefCell {
+        value: Node {
+            opcode: Ret,
+            typ: Bot,
+            defs: [
+                NodeDef(
+                    RefCell {
+                        value: Node {
+                            opcode: Start,
+                            typ: Bot,
+                            defs: [],
+                            uses: [
+                                NodeUse(
+                                    (Weak),
+                                ),
+                                NodeUse(
+                                    (Weak),
+                                ),
+                                NodeUse(
+                                    (Weak),
+                                ),
+                                NodeUse(
+                                    (Weak),
+                                ),
+                            ],
+                        },
+                    },
+                ),
+                NodeDef(
+                    RefCell {
+                        value: Node {
+                            opcode: Con,
+                            typ: Int(
+                                90,
+                            ),
+                            defs: [
+                                NodeDef(
+                                    RefCell {
+                                        value: Node {
+                                            opcode: Start,
+                                            typ: Bot,
+                                            defs: [],
+                                            uses: [
+                                                NodeUse(
+                                                    (Weak),
+                                                ),
+                                                NodeUse(
+                                                    (Weak),
+                                                ),
+                                                NodeUse(
+                                                    (Weak),
+                                                ),
+                                                NodeUse(
+                                                    (Weak),
+                                                ),
+                                            ],
+                                        },
+                                    },
+                                ),
+                            ],
+                            uses: [
+                                NodeUse(
+                                    (Weak),
+                                ),
+                            ],
+                        },
+                    },
+                ),
+            ],
+            uses: [],
+        },
+    },
+)
