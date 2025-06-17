@@ -6,10 +6,10 @@ int g() {
     return 10 + h();
 }
 
-int f() {
-    return 9 + g();
+int f(int x, int y) {
+    return x + y + g();
 }
 
 int main() {
-    return f();
+    return f(9, 10) + 3;
 }

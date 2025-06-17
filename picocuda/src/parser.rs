@@ -314,110 +314,38 @@ pub enum TT {
     PuncLeftParen, PuncRightParen, PuncLeftBrace, PuncRightBrace, PuncSemiColon, PuncComma,// punctuation
 }
 
-//  1. variations are explicitly typed. Collapsing categories like keywords
-//     into one variant will lose information since lexeme : String, which
-//     will produce redundant work for the parser during syntactic analysis
-//  2. non-tokens: comments, preprocessor directives, macros, whitespace
-
-pub fn lex(input: &[char]) -> Result<Vec<Token>, io::Error> {
+#[derive(Error, Debug)]
+pub enum LexError { #[error("(unknown token {unknown:?}")] UnknownToken { unknown: String } }
+pub fn lex(input: &[char]) -> Result<Vec<Token>, LexError> {
     let cs = skip_ws(input);
-
-    // literals and identifiers have arbitrary length
-    // operations and punctuations are single ASCII characters
+    // literals and identifiers have arbitrary length, operations and punctuations are single ASCII characters
     match cs {
         [] => Ok(vec![]),
         [f, r @ ..] => match f {
             '0'..='9' => scan_int(cs),
             'a'..='z' | 'A'..='Z' => scan_id(cs),
-            '+' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("+"), typ: TT::Plus };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '-' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("-"), typ: TT::Minus };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '*' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("*"), typ: TT::Star };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '/' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("/"), typ: TT::Slash };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '<' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("<"), typ: TT::LeftAngleBracket };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '>' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from(">"), typ: TT::RightAngleBracket };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '=' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("="), typ: TT::Equals };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '!' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("!"), typ: TT::Bang };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '&' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("&"), typ: TT::Amp };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '|' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("|"), typ: TT::Bar };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '(' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("("), typ: TT::PuncLeftParen };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            ')' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from(")"), typ: TT::PuncRightParen };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '{' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("{"), typ: TT::PuncLeftBrace };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            '}' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from("}"), typ: TT::PuncRightBrace };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            ';' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from(";"), typ: TT::PuncSemiColon };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            ',' => {
-                #[rustfmt::skip]
-                let t = Token { lexeme: String::from(","), typ: TT::PuncComma };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            _ => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("unexpected token: {:?}", f),
-            )),
+            '+' => { let t = Token { lexeme: String::from("+"), typ: TT::Plus }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '-' => { let t = Token { lexeme: String::from("-"), typ: TT::Minus }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '*' => { let t = Token { lexeme: String::from("*"), typ: TT::Star }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '/' => { let t = Token { lexeme: String::from("/"), typ: TT::Slash }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '<' => { let t = Token { lexeme: String::from("<"), typ: TT::LeftAngleBracket }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '>' => { let t = Token { lexeme: String::from(">"), typ: TT::RightAngleBracket }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '=' => { let t = Token { lexeme: String::from("="), typ: TT::Equals }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '!' => { let t = Token { lexeme: String::from("!"), typ: TT::Bang }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '&' => { let t = Token { lexeme: String::from("&"), typ: TT::Amp }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '|' => { let t = Token { lexeme: String::from("|"), typ: TT::Bar }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '(' => { let t = Token { lexeme: String::from("("), typ: TT::PuncLeftParen }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            ')' => { let t = Token { lexeme: String::from(")"), typ: TT::PuncRightParen }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '{' => { let t = Token { lexeme: String::from("{"), typ: TT::PuncLeftBrace }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            '}' => { let t = Token { lexeme: String::from("}"), typ: TT::PuncRightBrace }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            ';' => { let t = Token { lexeme: String::from(";"), typ: TT::PuncSemiColon }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            ',' => { let t = Token { lexeme: String::from(","), typ: TT::PuncComma }; Ok(iter::once(t).chain(lex(r)?).collect()) }
+            _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
         },
     }
 }
 
-fn scan_int(input: &[char]) -> Result<Vec<Token>, io::Error> {
+fn scan_int(input: &[char]) -> Result<Vec<Token>, LexError> {
     // scan_int calls skip_whitespace too to remain idempotent
     let cs = skip_ws(input);
 
@@ -425,32 +353,19 @@ fn scan_int(input: &[char]) -> Result<Vec<Token>, io::Error> {
         [] => Ok(vec![]),
         [f, _r @ ..] => match f {
             '0'..='9' => {
-                #[rustfmt::skip]
-                let i = _r
-                    .iter()
-                    .take_while(|&&c| c.is_numeric())
-                    .count();
-
+                let i = _r.iter().take_while(|&&c| c.is_numeric()).count();
                 let f = cs[..=i].iter().collect::<String>();
                 let r = &cs[i + 1..];
-
-                let t = Token {
-                    lexeme: f,
-                    typ: TT::LiteralInt,
-                };
-
+                let t = Token { lexeme: f, typ: TT::LiteralInt };
                 Ok(iter::once(t).chain(lex(r)?).collect())
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("unexpected token: {:?}", f),
-            )),
+            _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
         },
     }
 }
 
 // TODO: support identifiers with alpha*numeric* characters after first alphabetic
-fn scan_id(input: &[char]) -> Result<Vec<Token>, io::Error> {
+fn scan_id(input: &[char]) -> Result<Vec<Token>, LexError> {
     // scan_id calls skip_whitespace too to remain idempotent
     let cs = skip_ws(input);
 
@@ -459,828 +374,52 @@ fn scan_id(input: &[char]) -> Result<Vec<Token>, io::Error> {
         [f, r @ ..] => match f {
             'a'..='z' => {
                 // Find the index where the alphabetic characters end
-                #[rustfmt::skip]
-                let i = r
-                    .iter()
-                    .take_while(|&&c| c.is_alphabetic())
-                    .count();
+                let i = r.iter().take_while(|&&c| c.is_alphabetic()).count();
 
                 let f = (cs[..=i].iter()).collect::<String>();
                 let new_r = &cs[i + 1..];
 
                 let keyword = match f.as_str() {
-                    "int" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordInt,
-                    }),
-                    "if" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordIf,
-                    }),
-                    "else" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordEls,
-                    }),
-                    "for" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordFor,
-                    }),
-                    "while" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordWhile,
-                    }),
-                    "return" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordRet,
-                    }),
-                    "true" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordTrue,
-                    }),
-                    "false" => Some(Token {
-                        lexeme: f.to_string(),
-                        typ: TT::KeywordFalse,
-                    }),
+                    "int" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordInt }),
+                    "if" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordIf }),
+                    "else" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordEls }),
+                    "for" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordFor }),
+                    "while" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordWhile }),
+                    "return" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordRet }),
+                    "true" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordTrue }),
+                    "false" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordFalse }),
                     _ => None,
                 };
 
                 let t = match keyword {
                     Some(k) => k,
-                    None => Token {
-                        lexeme: f,
-                        typ: TT::Alias,
-                    },
+                    None => Token { lexeme: f, typ: TT::Alias },
                 };
-
                 Ok(iter::once(t).chain(lex(new_r)?).collect())
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("unexpected token: {:?}", f),
-            )),
+            _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
         },
     }
 }
 
-fn skip_ws(input: &[char]) -> &[char] {
-    match input {
-        [] => input,
-        [f, r @ ..] => {
-            if f.is_whitespace() {
-                skip_ws(r)
-            } else {
-                input
-            }
-        }
-    }
-}
+fn skip_ws(input: &[char]) -> &[char] { match input { [] => input, [f, r @ ..] => if f.is_whitespace() { skip_ws(r) } else { input } } }
 
 #[cfg(test)]
-mod lex_arith {
-    use std::fs;
-    const TEST_DIR: &str = "tests/arith";
+mod lexer {
+    fn read_input(test_dir: &str, path: &str) -> Vec<char> { std::fs::read(format!("{test_dir}/{path}")).expect("file dne").iter().map(|b| *b as char).collect::<Vec<_>>() }
 
-    #[test]
-    fn lit() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/lit.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
+    // arithmetic
+    #[test] fn lit() { let input = read_input("tests/arith", "/lit.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn add() { let input = read_input("tests/arith", "/add.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn add_compound() { let input = read_input("tests/arith", "/add_compound.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn sub() { let input = read_input("tests/arith", "/sub.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn mul() { let input = read_input("tests/arith", "/mul.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn div() { let input = read_input("tests/arith", "/div.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
 
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "8",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
+    // bindings
+    #[test] fn asnmt() { let input = read_input("tests/bindigns", "/asnmt.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn composition() { let input = read_input("tests/bindings", "/composition.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
 
-    #[test]
-    fn add() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/add.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "9",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "+",
-                typ: Plus,
-            },
-            Token {
-                lexeme: "10",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
-
-    #[test]
-    fn add_compound() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/add_compound.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "9",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "+",
-                typ: Plus,
-            },
-            Token {
-                lexeme: "10",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "+",
-                typ: Plus,
-            },
-            Token {
-                lexeme: "11",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
-
-    #[test]
-    fn sub() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{}/sub.c", TEST_DIR))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "88",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "-",
-                typ: Minus,
-            },
-            Token {
-                lexeme: "32",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
-
-    #[test]
-    fn mul() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/mul.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "9",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "*",
-                typ: Star,
-            },
-            Token {
-                lexeme: "10",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
-
-    #[test]
-    fn div() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/div.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "100",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "/",
-                typ: Slash,
-            },
-            Token {
-                lexeme: "9",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
-}
-
-#[cfg(test)]
-mod lex_bindings {
-    use std::fs;
-    const TEST_DIR: &str = "tests/bindings";
-
-    #[test]
-    fn asnmt() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/asnmt.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "x",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "=",
-                typ: Equals,
-            },
-            Token {
-                lexeme: "8",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "x",
-                typ: Alias,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
-
-    #[test]
-    fn composition() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/composition.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "h",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "11",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "g",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "10",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "+",
-                typ: Plus,
-            },
-            Token {
-                lexeme: "h",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "f",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "9",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: "+",
-                typ: Plus,
-            },
-            Token {
-                lexeme: "g",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "f",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
-}
-
-#[cfg(test)]
-mod lex_control {
-    use std::fs;
-    const TEST_DIR: &str = "tests/control";
-
-    #[test]
-    fn branch() {
-        #[rustfmt::skip]
-        let input = fs::read(format!("{TEST_DIR}/ifels_then.c"))
-            .expect("file dne")
-            .iter()
-            .map(|b| *b as char)
-            .collect::<Vec<_>>();
-
-        let output = super::lex(input.as_slice()).unwrap();
-        insta::assert_debug_snapshot!(output, @r###"
-        [
-            Token {
-                lexeme: "int",
-                typ: KeywordInt,
-            },
-            Token {
-                lexeme: "main",
-                typ: Alias,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "if",
-                typ: KeywordIf,
-            },
-            Token {
-                lexeme: "(",
-                typ: PuncLeftParen,
-            },
-            Token {
-                lexeme: "1",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ")",
-                typ: PuncRightParen,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "9",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-            Token {
-                lexeme: "else",
-                typ: KeywordEls,
-            },
-            Token {
-                lexeme: "{",
-                typ: PuncLeftBrace,
-            },
-            Token {
-                lexeme: "return",
-                typ: KeywordRet,
-            },
-            Token {
-                lexeme: "10",
-                typ: LiteralInt,
-            },
-            Token {
-                lexeme: ";",
-                typ: PuncSemiColon,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-            Token {
-                lexeme: "}",
-                typ: PuncRightBrace,
-            },
-        ]
-        "###);
-    }
+    // control
+    #[test] fn branch() { let input = read_input("tests/control", "/ifels_then.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
 }
