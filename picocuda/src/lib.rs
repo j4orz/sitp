@@ -1,31 +1,58 @@
 #![feature(assert_matches)]
 
+// Qs
+// - what's the point of maintaining D->U edges? (aka outputs/uses)
+
+// TODOs (day4)
+// - garbage collect weak edges from D->U
+// - test scope
+// - ir dump
+
 pub mod generator;
 pub mod optimizer;
 pub mod parser;
 
-use std::{cell::RefCell, collections::VecDeque, mem, ops::Deref, rc::{Rc, Weak}};
-use crate::optimizer::Type;
+use std::{cell::RefCell, collections::VecDeque, ops::Deref, rc::{Rc, Weak}};
+use thiserror::Error;
+
+use crate::{optimizer::Type, parser::Parser};
+
+
+pub struct NodeIdCounter(u128);
+impl NodeIdCounter { fn new(start: u128) -> Self { Self(start)} fn gen_nodeid(&mut self) -> u128 { self.0 += 1; self.0 }}
+
+// pub struct Driver { parser: Parser }
+// impl Driver { fn drive() }
+
+fn driver() -> () {
+    let mut nodeid_counter = NodeIdCounter::new(0);
+    let mut parser = Parser::new(&mut nodeid_counter);
+    let _ = parser.parse(&vec![]);
+}
 
 // NB. SoN is the third:
 //     a. tree: precedence is represented via tree's hierarchy.
 //     b. two-tiered nested graph of basic blocks of instructions: edges denote ONLY control flow
 //     c. single-tiered flat graph of instructions: edges denote control flow OR data flow
+
+thread_local! { pub static NODEID: RefCell<u128> = RefCell::new(0) }
+fn gen_nodeid() -> u128 { NODEID.with(|id| { *id.borrow_mut() += 1; *id.borrow()}) }
 #[derive(Debug)] pub enum OpCode { Start, Ret, Con, Add, Sub, Mul, Div, Scope }
-#[derive(Debug)]
-pub struct Node {
-    opcode: OpCode, typ: Type, // all nodes including control have types
+#[derive(Debug)] pub struct Node {
+    id: u128, opcode: OpCode, typ: Type, // all nodes including control have types
     defs: VecDeque<NodeDef>, uses: VecDeque<NodeUse>, // uses/users
 }
+impl PartialEq for Node { fn eq(&self, other: &Self) -> bool { todo!() } }
 
 // some code in simple relies on invariant that first edge is control.
 // this is removed for now so edge type is not optioned. watch out for this.
 // removed: matched on the opcode. if add/sub/etc set self.defs[0] to none
 impl Node {
-    pub fn new(op: OpCode) -> NodeDef { NodeDef::new(Node { opcode: op, typ: Type::Bot, defs: VecDeque::new(), uses: VecDeque::new() }) }
-    pub fn new_constant(op: OpCode, typint: Type) -> NodeDef { NodeDef::new(Node { opcode: op, typ: typint, defs: VecDeque::new(), uses: VecDeque::new()} )}
+    pub fn new(nodeid_coutner: &mut NodeIdCounter, op: OpCode) -> NodeDef { NodeDef::new(Node { id: nodeid_coutner.gen_nodeid(), opcode: op, typ: Type::Bot, defs: VecDeque::new(), uses: VecDeque::new() })}
+    pub fn new_constant(nodeid_counter: &mut NodeIdCounter, op: OpCode, typint: Type) -> NodeDef { NodeDef::new(Node { id: nodeid_counter.gen_nodeid(), opcode: op, typ: typint, defs: VecDeque::new(), uses: VecDeque::new()} )}
 }
 
+#[derive(Error, Debug)] pub enum NodeError { #[error("use not found")] UseNotFound }
 #[derive(Debug)] pub struct NodeDef(Rc<RefCell<Node>>);
 #[derive(Debug)] pub struct NodeUse(Weak<RefCell<Node>>);
 impl NodeDef {
@@ -34,14 +61,31 @@ impl NodeDef {
         self.borrow_mut().defs.push_back(def.clone());
         def.borrow_mut().uses.push_back(NodeUse::new(self));
     }
+    pub fn kill(&mut self) -> Result<(), NodeError> { // removes bidirectional edges (both D->U with .del_use() and D<-U with .pop_back())
+        // TODO: assert no uses of this node
+        while let Some(mut def) = self.borrow_mut().defs.pop_back() { def.del_use(&NodeUse::new(&self))?; };
+        Ok(())
+    }
+    pub fn del_use(&mut self, u_target: &NodeUse) -> Result<(), NodeError> {
+        let i = &self.borrow().uses.iter().position(|u| u == u_target).ok_or(NodeError::UseNotFound)?;
+        let uses = &mut self.borrow_mut().uses;
+        let _ = uses.make_contiguous();
+        let (head, _tail) = uses.as_mut_slices();
+        head.swap(*i, head.len()-1);
+        Ok(())
+    }
 }
 impl NodeUse { fn new(e: &NodeDef) -> Self { Self(Rc::downgrade(&e.0)) } }
 impl Deref for NodeDef { type Target = Rc<RefCell<Node>>; fn deref(&self) -> &Self::Target { &self.0 } }
 impl Deref for NodeUse { type Target = Weak<RefCell<Node>>; fn deref(&self) -> &Self::Target { &self.0 }}
 impl Clone for NodeDef { fn clone(&self) -> Self { Self(self.0.clone()) } }
 impl Clone for NodeUse { fn clone(&self) -> Self { Self(self.0.clone()) } }
-// impl Drop for NodeDef {
-//     fn drop(&mut self) {
-//         todo!()
-//     }
-// }
+impl PartialEq for NodeUse {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.0.upgrade(), other.0.upgrade()) {
+            (Some(a), Some(b)) => *a.borrow() == *b.borrow(),
+            (None,  None) => panic!(), _ => panic!(),
+        }
+    }
+}
+impl Drop for NodeDef { fn drop(&mut self) {} }

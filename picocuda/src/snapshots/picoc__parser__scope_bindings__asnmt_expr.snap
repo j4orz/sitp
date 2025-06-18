@@ -5,12 +5,14 @@ expression: graph
 NodeDef(
     RefCell {
         value: Node {
+            id: 13,
             opcode: Ret,
             typ: Bot,
             defs: [
                 NodeDef(
                     RefCell {
                         value: Node {
+                            id: 2,
                             opcode: Start,
                             typ: Bot,
                             defs: [],
@@ -46,6 +48,7 @@ NodeDef(
                 NodeDef(
                     RefCell {
                         value: Node {
+                            id: 12,
                             opcode: Con,
                             typ: Int(
                                 222,
@@ -54,6 +57,7 @@ NodeDef(
                                 NodeDef(
                                     RefCell {
                                         value: Node {
+                                            id: 2,
                                             opcode: Start,
                                             typ: Bot,
                                             defs: [],

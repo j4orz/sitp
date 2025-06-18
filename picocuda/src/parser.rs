@@ -1,8 +1,6 @@
 use std::{collections::HashMap, iter};
-use crate::{optimizer::Type, Node, NodeDef, OpCode};
+use crate::{optimizer::Type, Node, NodeDef, NodeIdCounter, OpCode};
 use thiserror::Error;
-
-thread_local! { pub static START: NodeDef = Node::new(OpCode::Start) }
 
 #[derive(Error, Debug)]
 pub enum ParseError {
@@ -11,10 +9,10 @@ pub enum ParseError {
     #[error("(expected {expected:?}, found {actual:?})")] Mismatch { expected: String, actual: String },
 }
 
-pub struct Parser { scope: Scope }
+pub struct Parser<'b> { nodeid_counter: &'b mut NodeIdCounter, start: NodeDef, scope: Scope }
 
-impl Parser {
-    pub fn new() -> Self { Self { scope: Scope::new() }}
+impl<'b> Parser<'b> {
+    pub fn new(nodeid_counter: &'b mut NodeIdCounter) -> Self { Self { scope: Scope::new(nodeid_counter), start: Node::new(nodeid_counter, OpCode::Start), nodeid_counter } }
 
     // NB. each function in the parser will parse in two ways
     //     a. conditionally (SUM/OR): match tokens(first, rest) first.typ { TT::Foo => {}, TT::Bar => {}, TT::Baz => {} }
@@ -92,9 +90,8 @@ impl Parser {
                 TT::KeywordRet => {
                     let (expr, r) = self.parse_expr(r)?;
                     let (_, r) = self.require(r, TT::PuncSemiColon)?;
-                    let start = START.with(|s| s.clone());
-                    let ret = Node::new(OpCode::Ret);
-                    let _ = NodeDef::add_def(&ret, &start);
+                    let ret = Node::new(self.nodeid_counter, OpCode::Ret);
+                    let _ = NodeDef::add_def(&ret, &self.start);
                     let _ = NodeDef::add_def(&ret, &expr);
 
                     Ok((ret, r))
@@ -107,11 +104,11 @@ impl Parser {
         }
     }
 
-    fn parse_expr<'a>(&self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_expr<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
         self.parse_term(tokens)
     }
 
-    fn parse_term<'a>(&self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_term<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
         let (x, r) = self.parse_factor(tokens)?;
 
         match r {
@@ -119,22 +116,22 @@ impl Parser {
             [f, _r @ ..] => match f.typ {
                 TT::Plus => {
                     let (y, r) = self.parse_term(_r)?;
-                    let add = Node::new(OpCode::Add);
+                    let add = Node::new(self.nodeid_counter, OpCode::Add);
                     let (_, _) = (add.add_def(&x), add.add_def(&y));
-                    Ok((add.peephole(), r))
+                    Ok((add.peephole(self.nodeid_counter, &self.start), r))
                 }
                 TT::Minus => {
                     let (y, r) = self.parse_term(_r)?;
-                    let sub = Node::new(OpCode::Sub);
+                    let sub = Node::new(self.nodeid_counter, OpCode::Sub);
                     let (_, _) = (sub.add_def(&x), sub.add_def(&y));
-                    Ok((sub.peephole(), r))
+                    Ok((sub.peephole(self.nodeid_counter, &self.start), r))
                 }
                 _ => Ok((x, r)),
             },
         }
     }
 
-    fn parse_factor<'a>(&self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_factor<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
         let (x, r) = self.parse_atom(tokens)?;
 
         match r {
@@ -142,31 +139,30 @@ impl Parser {
             [f, _r @ ..] => match f.typ {
                 TT::Star => {
                     let (y, r) = self.parse_factor(_r)?;
-                    let mul = Node::new(OpCode::Mul);
+                    let mul = Node::new(self.nodeid_counter, OpCode::Mul);
                     let (_, _) = (mul.add_def(&x), mul.add_def(&y));
-                    Ok((mul.peephole(), r))
+                    Ok((mul.peephole(self.nodeid_counter, &self.start), r))
                 }
                 TT::Slash => {
                     let (y, r) = self.parse_factor(_r)?;
-                    let div = Node::new(OpCode::Div);
+                    let div = Node::new(self.nodeid_counter, OpCode::Div);
                     let (_, _) = (div.add_def(&x), div.add_def(&y));
-                    Ok((div.peephole(), r))
+                    Ok((div.peephole(self.nodeid_counter, &self.start), r))
                 }
                 _ => Ok((x, r)),
             },
         }
     }
 
-    fn parse_atom<'a>(&self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_atom<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
         match tokens {
             [] => Err(ParseError::Mismatch { expected: "".to_string(), actual: "".to_string() }),
             [f, r @ ..] => match f.typ {
                 TT::LiteralInt => {
-                    let start = START.with(|s| s.clone());
-                    let lit = Node::new_constant(OpCode::Con, Type::Int(f.lexeme.parse().unwrap()));
-                    let _ = lit.add_def(&start);
+                    let lit = Node::new_constant(self.nodeid_counter, OpCode::Con, Type::Int(f.lexeme.parse().unwrap()));
+                    let _ = lit.add_def(&self.start);
                     
-                    Ok((lit.peephole(), r))
+                    Ok((lit.peephole(self.nodeid_counter, &self.start), r))
                 }
                 TT::Alias => {
                     let expr = self.scope.varapp(&f.lexeme)?;
@@ -200,7 +196,7 @@ impl Parser {
 
 #[cfg(test)]
 mod parse_arith {
-    use crate::{parser::{lex, Parser}, OpCode};
+    use crate::{parser::{lex, Parser}, NodeIdCounter, OpCode};
     use std::{assert_matches::assert_matches, fs};
     
     const TEST_DIR: &str = "tests/arith";
@@ -213,7 +209,8 @@ mod parse_arith {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
@@ -230,7 +227,8 @@ mod parse_arith {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
@@ -248,7 +246,7 @@ mod parse_arith {
 //     that is, the scope's node has no uses.
 pub struct Scope { node: NodeDef, nvs: Vec<HashMap<String, usize>> }
 impl Scope {
-    fn new() -> Self { Self { node: Node::new(OpCode::Scope), nvs: Vec::new() } }
+    fn new(nodeid_counter: &mut NodeIdCounter) -> Self { Self { node: Node::new(nodeid_counter, OpCode::Scope), nvs: Vec::new() } }
     fn push_nv(&mut self) -> () { self.nvs.push(HashMap::new()) }
     fn pop_nv(&mut self) -> () { let _ = self.nvs.pop().unwrap(); }
     fn varapp(&self, alias: &str) -> Result<NodeDef, ScopeError> {self.read_update(alias, ScopeOp::Read, self.nvs.len()-1)}
@@ -285,8 +283,8 @@ enum ScopeOp { Read, Update(NodeDef) }
 
 #[cfg(test)]
 mod scope_bindings {
-    use crate::{parser::{lex, Parser}, OpCode};
-    use std::{assert_matches::assert_matches, fs};
+    use crate::{parser::{lex, Parser}, NodeIdCounter};
+    use std::fs;
     
     const TEST_DIR: &str = "tests/bindings";
 
@@ -298,7 +296,8 @@ mod scope_bindings {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
@@ -313,7 +312,8 @@ mod scope_bindings {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 

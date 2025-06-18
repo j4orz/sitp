@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::{parser, NodeDef, Node, OpCode};
+use crate::{Node, NodeDef, NodeIdCounter, OpCode};
 
 // types form a symmetric complete bounded (ranked) lattice
 // see: https://en.wikipedia.org/wiki/Lattice_(order)
@@ -26,16 +26,15 @@ impl Type {
 }
 
 impl NodeDef {
-    pub fn peephole(self) -> NodeDef {
+    pub fn peephole(self, nodeid_counter: &mut NodeIdCounter, start_node: &NodeDef ) -> NodeDef {
         self.borrow_mut().typ = self.eval_type();
 
         let peepholed = match self.borrow().opcode {
             OpCode::Con => None, // already folded
             _ => match self.borrow().typ.is_constant() { // o/w, perform constant folding
                 true => {
-                    let start = parser::START.with(|s| s.clone());
-                    let con = Node::new_constant( OpCode::Con, self.borrow().typ);
-                    let _ = con.add_def(&start);
+                    let con = Node::new_constant( nodeid_counter, OpCode::Con, self.borrow().typ);
+                    let _ = con.add_def(start_node);
                     Some(con)
                 },
                 false => { None },
@@ -82,7 +81,7 @@ impl NodeDef {
 
 #[cfg(test)]
 mod peephole {
-    use crate::{parser::{lex, Parser}, OpCode};
+    use crate::{parser::{lex, Parser}, NodeIdCounter, OpCode};
     use std::{assert_matches::assert_matches, fs};
     
     const TEST_DIR: &str = "tests/arith";
@@ -95,7 +94,8 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
@@ -112,7 +112,8 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
@@ -129,7 +130,8 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
@@ -146,7 +148,8 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
@@ -163,7 +166,8 @@ mod peephole {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut parser = Parser::new();
+        let mut nodeid_counter = NodeIdCounter::new(0);
+        let mut parser = Parser::new(&mut nodeid_counter);
         let tokens = lex(&chars).unwrap();
         let graph = parser.parse(&tokens).unwrap();
 
