@@ -28,25 +28,18 @@ impl Type {
 impl NodeDef {
     pub fn peephole(self, nodeid_counter: &mut NodeIdCounter, start_node: &NodeDef ) -> NodeDef {
         self.borrow_mut().typ = self.eval_type();
-
-        let peepholed = match self.borrow().opcode {
-            OpCode::Con => None, // already folded
-            _ => match self.borrow().typ.is_constant() { // o/w, perform constant folding
-                true => {
-                    let con = Node::new_constant( nodeid_counter, OpCode::Con, self.borrow().typ);
-                    let _ = con.add_def(start_node);
-                    Some(con)
-                },
-                false => { None },
-            }
+        let peepholed = match (self.borrow().opcode, self.borrow().typ.is_constant()) {
+            (OpCode::Con, true) | (_, false) => None,
+            (_, true) => {
+                let con = Node::new_constant( nodeid_counter, OpCode::Con, self.borrow().typ);
+                let _ = con.add_def(start_node);
+                println!("constant folded with node: {:?}", con);
+                Some(con)
+            },
         };
-
-        // NB: explicit mem::drop over implicit ops::Drop::drop for the purpose of
-        //     invariant assertion: this node (and it's edges) SHOULD be droppable.
-        match peepholed {
-            Some(peeped) => { mem::drop(self); peeped },
-            None => self,
-        }
+ 
+        // NB: explicit drop over implicit for asserting invariant: this node (and it's edges) SHOULD be droppable.
+        match peepholed { Some(peeped) => { mem::drop(self); peeped } None => self }
     }
 
     // see: https://en.wikipedia.org/wiki/Partial_evaluation

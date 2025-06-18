@@ -23,12 +23,6 @@ NodeDef(
                                 NodeUse(
                                     (Weak),
                                 ),
-                                NodeUse(
-                                    (Weak),
-                                ),
-                                NodeUse(
-                                    (Weak),
-                                ),
                             ],
                         },
                     },
@@ -50,12 +44,6 @@ NodeDef(
                                             typ: Bot,
                                             defs: [],
                                             uses: [
-                                                NodeUse(
-                                                    (Weak),
-                                                ),
-                                                NodeUse(
-                                                    (Weak),
-                                                ),
                                                 NodeUse(
                                                     (Weak),
                                                 ),
