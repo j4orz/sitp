@@ -1,5 +1,5 @@
 use std::{collections::HashMap, iter};
-use crate::{optimizer::Type, Node, NodeDef, NodeIdCounter, OpCode};
+use super::{optimizer::Type, Node, NodeDef, NodeIdCounter, OpCode};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -196,7 +196,7 @@ impl<'b> Parser<'b> {
 
 #[cfg(test)]
 mod parse_arith {
-    use crate::{parser::{lex, Parser}, NodeIdCounter, OpCode};
+    use crate::son::{parser::{lex, Parser}, NodeIdCounter, OpCode};
     use std::{assert_matches::assert_matches, fs};
     
     const TEST_DIR: &str = "tests/arith";
@@ -283,7 +283,7 @@ enum ScopeOp { Read, Update(NodeDef) }
 
 #[cfg(test)]
 mod scope_bindings {
-    use crate::{parser::{lex, Parser}, NodeIdCounter};
+    use crate::son::{parser::{lex, Parser}, NodeIdCounter};
     use std::fs;
     
     const TEST_DIR: &str = "tests/bindings";

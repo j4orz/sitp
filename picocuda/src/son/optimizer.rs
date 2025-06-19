@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::{Node, NodeDef, NodeIdCounter, OpCode};
+use super::{Node, NodeDef, NodeIdCounter, OpCode};
 
 // types form a symmetric complete bounded (ranked) lattice
 // see: https://en.wikipedia.org/wiki/Lattice_(order)
@@ -74,7 +74,7 @@ impl NodeDef {
 
 #[cfg(test)]
 mod peephole {
-    use crate::{parser::{lex, Parser}, NodeIdCounter, OpCode};
+    use crate::son::{parser::{lex, Parser}, NodeIdCounter, OpCode};
     use std::{assert_matches::assert_matches, fs};
     
     const TEST_DIR: &str = "tests/arith";
