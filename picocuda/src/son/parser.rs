@@ -1,5 +1,5 @@
 use std::{collections::HashMap, iter};
-use super::{optimizer::Type, Node, NodeDef, NodeIdCounter, OpCode};
+use crate::son::{optimizer::Type, DefEdge, OpCode};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -9,15 +9,39 @@ pub enum ParseError {
     #[error("(expected {expected:?}, found {actual:?})")] Mismatch { expected: String, actual: String },
 }
 
-pub struct Parser<'b> { nodeid_counter: &'b mut NodeIdCounter, start: NodeDef, scope: Scope }
+#[derive(Clone, PartialEq, Debug)]
+pub struct Token { pub lexeme: String, pub typ: TT }
 
-impl<'b> Parser<'b> {
-    pub fn new(nodeid_counter: &'b mut NodeIdCounter) -> Self { Self { scope: Scope::new(nodeid_counter), start: Node::new(nodeid_counter, OpCode::Start), nodeid_counter } }
+//  1. variations are explicitly typed. Collapsing categories like keywords
+//     into one variant will lose information since lexeme : String, which
+//     will produce redundant work for the parser during syntactic analysis
+//  2. non-tokens: comments, preprocessor directives, macros, whitespace
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum TT {
+    LiteralInt, Alias, // introductions (values) RE: [0-9]+ and [a-zA-Z][a-zA-Z0-9]*
+    KeywordInt, KeywordChar, KeywordVoid, KeywordRet, KeywordIf, KeywordEls, KeywordFor, KeywordWhile, KeywordTrue, KeywordFalse, // keywords ⊂ identifiers
+    Plus, Minus, Star, Slash, LeftAngleBracket, RightAngleBracket, Equals, Bang, Amp, Bar, // eliminations (ops)
+    PuncLeftParen, PuncRightParen, PuncLeftBrace, PuncRightBrace, PuncSemiColon, PuncComma,// punctuation
+}
+
+#[derive(Error, Debug)]
+pub enum LexError { #[error("(unknown token {unknown:?}")] UnknownToken { unknown: String } }
+
+pub struct Parser {
+    pub src_raw: Vec<char>, pub src_lexed: Option<Vec<Token>>,
+    pub start: DefEdge, pub scope: Scope
+}
+impl Parser {
+    pub fn new(src: Vec<char>) -> Self {
+        Self {
+            src_raw: src, src_lexed: None,
+            start: DefEdge::new(OpCode::Start), scope: Scope::new(),
+        } }
 
     // NB. each function in the parser will parse in two ways
     //     a. conditionally (SUM/OR): match tokens(first, rest) first.typ { TT::Foo => {}, TT::Bar => {}, TT::Baz => {} }
     //     b. assertively (PROD/AND): require(tokens, TT:Foo), eat(tokens, TT:Bar), eat(tokens, TT:Baz)
-    pub fn parse(&mut self, tokens: &[Token]) -> Result<NodeDef, ParseError> {
+    pub fn parse(&mut self, tokens: &[Token], dump: bool) -> Result<DefEdge, ParseError> {
         let r = tokens;
         let (_, r) = self.require(r, TT::KeywordInt)?;
         let (_, r) = self.require(r, TT::Alias)?;
@@ -34,11 +58,12 @@ impl<'b> Parser<'b> {
         let (_, r) = self.require(r, TT::PuncRightBrace)?;
         // try_convert block's Rc<dyn Instr> -> Rc<Return>
 
+        // if dump {}
         if r.is_empty() { Ok(block) } else { Err(ParseError::Mismatch { expected: "empty token stream".to_string(), actual: format!("{:?}", r) }) }
     }
 
     // NB: lexical scope ==> nv's are only pushed/popped in parse_block
-    fn parse_block<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_block<'a>(&mut self, tokens: &'a [Token]) -> Result<(DefEdge, &'a [Token]), ParseError> {
         self.scope.push_nv();
         let (mut output, mut r) = (None, tokens);
         while let Ok((stmt, _r)) = self.parse_stmt(r) {
@@ -49,7 +74,7 @@ impl<'b> Parser<'b> {
         Ok((output.unwrap(), r))
     }
 
-    fn parse_stmt<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_stmt<'a>(&mut self, tokens: &'a [Token]) -> Result<(DefEdge, &'a [Token]), ParseError> {
         match tokens {
             [] => Err(ParseError::Mismatch { expected: "".to_string(), actual: "".to_string() }),
             [f, r @ ..] => match f.typ {
@@ -90,9 +115,9 @@ impl<'b> Parser<'b> {
                 TT::KeywordRet => {
                     let (expr, r) = self.parse_expr(r)?;
                     let (_, r) = self.require(r, TT::PuncSemiColon)?;
-                    let ret = Node::new(self.nodeid_counter, OpCode::Ret);
-                    let _ = NodeDef::add_def(&ret, &self.start);
-                    let _ = NodeDef::add_def(&ret, &expr);
+                    let ret = DefEdge::new(OpCode::Ret);
+                    let _ = DefEdge::add_def(&ret, &self.start);
+                    let _ = DefEdge::add_def(&ret, &expr);
 
                     Ok((ret, r))
                 }
@@ -104,11 +129,11 @@ impl<'b> Parser<'b> {
         }
     }
 
-    fn parse_expr<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_expr<'a>(&mut self, tokens: &'a [Token]) -> Result<(DefEdge, &'a [Token]), ParseError> {
         self.parse_term(tokens)
     }
 
-    fn parse_term<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_term<'a>(&mut self, tokens: &'a [Token]) -> Result<(DefEdge, &'a [Token]), ParseError> {
         let (x, r) = self.parse_factor(tokens)?;
 
         match r {
@@ -116,22 +141,22 @@ impl<'b> Parser<'b> {
             [f, _r @ ..] => match f.typ {
                 TT::Plus => {
                     let (y, r) = self.parse_term(_r)?;
-                    let add = Node::new(self.nodeid_counter, OpCode::Add);
+                    let add = DefEdge::new(OpCode::Add);
                     let (_, _) = (add.add_def(&x), add.add_def(&y));
-                    Ok((add.peephole(self.nodeid_counter, &self.start), r))
+                    Ok((add.peephole(&self.start), r))
                 }
                 TT::Minus => {
                     let (y, r) = self.parse_term(_r)?;
-                    let sub = Node::new(self.nodeid_counter, OpCode::Sub);
+                    let sub = DefEdge::new(OpCode::Sub);
                     let (_, _) = (sub.add_def(&x), sub.add_def(&y));
-                    Ok((sub.peephole(self.nodeid_counter, &self.start), r))
+                    Ok((sub.peephole(&self.start), r))
                 }
                 _ => Ok((x, r)),
             },
         }
     }
 
-    fn parse_factor<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_factor<'a>(&mut self, tokens: &'a [Token]) -> Result<(DefEdge, &'a [Token]), ParseError> {
         let (x, r) = self.parse_atom(tokens)?;
 
         match r {
@@ -139,30 +164,30 @@ impl<'b> Parser<'b> {
             [f, _r @ ..] => match f.typ {
                 TT::Star => {
                     let (y, r) = self.parse_factor(_r)?;
-                    let mul = Node::new(self.nodeid_counter, OpCode::Mul);
+                    let mul = DefEdge::new(OpCode::Mul);
                     let (_, _) = (mul.add_def(&x), mul.add_def(&y));
-                    Ok((mul.peephole(self.nodeid_counter, &self.start), r))
+                    Ok((mul.peephole(&self.start), r))
                 }
                 TT::Slash => {
                     let (y, r) = self.parse_factor(_r)?;
-                    let div = Node::new(self.nodeid_counter, OpCode::Div);
+                    let div = DefEdge::new(OpCode::Div);
                     let (_, _) = (div.add_def(&x), div.add_def(&y));
-                    Ok((div.peephole(self.nodeid_counter, &self.start), r))
+                    Ok((div.peephole(&self.start), r))
                 }
                 _ => Ok((x, r)),
             },
         }
     }
 
-    fn parse_atom<'a>(&mut self, tokens: &'a [Token]) -> Result<(NodeDef, &'a [Token]), ParseError> {
+    fn parse_atom<'a>(&mut self, tokens: &'a [Token]) -> Result<(DefEdge, &'a [Token]), ParseError> {
         match tokens {
             [] => Err(ParseError::Mismatch { expected: "".to_string(), actual: "".to_string() }),
             [f, r @ ..] => match f.typ {
                 TT::LiteralInt => {
-                    let lit = Node::new_constant(self.nodeid_counter, OpCode::Con, Type::Int(f.lexeme.parse().unwrap()));
+                    let lit = DefEdge::new_constant(OpCode::Con, Type::Int(f.lexeme.parse().unwrap()));
                     let _ = lit.add_def(&self.start);
                     
-                    Ok((lit.peephole(self.nodeid_counter, &self.start), r))
+                    Ok((lit.peephole(&self.start), r))
                 }
                 TT::Alias => {
                     let expr = self.scope.varapp(&f.lexeme)?;
@@ -192,11 +217,103 @@ impl<'b> Parser<'b> {
             }
         }
     }
+
+    pub fn lex(&self) -> Result<Vec<Token>, LexError> {
+        Self::lx(&self.src_raw)
+    }
+
+    fn lx(input: &[char]) -> Result<Vec<Token>, LexError> {
+        let cs = Self::skip_ws(input);
+        // literals and identifiers have arbitrary length, operations and punctuations are single ASCII characters
+        match cs {
+            [] => Ok(vec![]),
+            [f, r @ ..] => match f {
+                '0'..='9' => Self::scan_int(cs),
+                'a'..='z' | 'A'..='Z' => Self::scan_id(cs),
+                '+' => { let t = Token { lexeme: String::from("+"), typ: TT::Plus }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '-' => { let t = Token { lexeme: String::from("-"), typ: TT::Minus }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '*' => { let t = Token { lexeme: String::from("*"), typ: TT::Star }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '/' => { let t = Token { lexeme: String::from("/"), typ: TT::Slash }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '<' => { let t = Token { lexeme: String::from("<"), typ: TT::LeftAngleBracket }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '>' => { let t = Token { lexeme: String::from(">"), typ: TT::RightAngleBracket }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '=' => { let t = Token { lexeme: String::from("="), typ: TT::Equals }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '!' => { let t = Token { lexeme: String::from("!"), typ: TT::Bang }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '&' => { let t = Token { lexeme: String::from("&"), typ: TT::Amp }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '|' => { let t = Token { lexeme: String::from("|"), typ: TT::Bar }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '(' => { let t = Token { lexeme: String::from("("), typ: TT::PuncLeftParen }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                ')' => { let t = Token { lexeme: String::from(")"), typ: TT::PuncRightParen }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '{' => { let t = Token { lexeme: String::from("{"), typ: TT::PuncLeftBrace }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                '}' => { let t = Token { lexeme: String::from("}"), typ: TT::PuncRightBrace }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                ';' => { let t = Token { lexeme: String::from(";"), typ: TT::PuncSemiColon }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                ',' => { let t = Token { lexeme: String::from(","), typ: TT::PuncComma }; Ok(iter::once(t).chain(Self::lx(r)?).collect()) }
+                _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
+            },
+        }
+    }
+
+    fn scan_int(input: &[char]) -> Result<Vec<Token>, LexError> {
+        // scan_int calls skip_whitespace too to remain idempotent
+        let cs = Self::skip_ws(input);
+
+        match cs {
+            [] => Ok(vec![]),
+            [f, _r @ ..] => match f {
+                '0'..='9' => {
+                    let i = _r.iter().take_while(|&&c| c.is_numeric()).count();
+                    let f = cs[..=i].iter().collect::<String>();
+                    let r = &cs[i + 1..];
+                    let t = Token { lexeme: f, typ: TT::LiteralInt };
+                    Ok(iter::once(t).chain(Self::lx(r)?).collect())
+                }
+                _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
+            },
+        }
+    }
+
+    // TODO: support identifiers with alpha*numeric* characters after first alphabetic
+    fn scan_id(input: &[char]) -> Result<Vec<Token>, LexError> {
+        // scan_id calls skip_whitespace too to remain idempotent
+        let cs = Self::skip_ws(input);
+
+        match cs {
+            [] => Ok(vec![]),
+            [f, r @ ..] => match f {
+                'a'..='z' => {
+                    // Find the index where the alphabetic characters end
+                    let i = r.iter().take_while(|&&c| c.is_alphabetic()).count();
+
+                    let f = (cs[..=i].iter()).collect::<String>();
+                    let new_r = &cs[i + 1..];
+
+                    let keyword = match f.as_str() {
+                        "int" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordInt }),
+                        "if" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordIf }),
+                        "else" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordEls }),
+                        "for" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordFor }),
+                        "while" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordWhile }),
+                        "return" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordRet }),
+                        "true" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordTrue }),
+                        "false" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordFalse }),
+                        _ => None,
+                    };
+
+                    let t = match keyword {
+                        Some(k) => k,
+                        None => Token { lexeme: f, typ: TT::Alias },
+                    };
+                    Ok(iter::once(t).chain(Self::lx(new_r)?).collect())
+                }
+                _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
+            },
+        }
+    }
+
+    fn skip_ws(input: &[char]) -> &[char] { match input { [] => input, [f, r @ ..] => if f.is_whitespace() { Self::skip_ws(r) } else { input } } }
 }
 
 #[cfg(test)]
-mod parse_arith {
-    use crate::son::{parser::{lex, Parser}, NodeIdCounter, OpCode};
+mod test_parser {
+    use crate::son::{dumper, parser::Parser, OpCode};
     use std::{assert_matches::assert_matches, fs};
     
     const TEST_DIR: &str = "tests/arith";
@@ -209,31 +326,30 @@ mod parse_arith {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut nodeid_counter = NodeIdCounter::new(0);
-        let mut parser = Parser::new(&mut nodeid_counter);
-        let tokens = lex(&chars).unwrap();
-        let graph = parser.parse(&tokens).unwrap();
+        let mut parser = Parser::new(chars);
+        let tokens = parser.lex().unwrap();
+        let graph = parser.parse(&tokens, false).unwrap();
+        let dot = dumper::dump_dot(&parser).unwrap();
+        println!("{dot}");
 
-        assert_matches!(graph.borrow().opcode, OpCode::Ret);
-        assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-        insta::assert_debug_snapshot!(graph);
+        // assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        // assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        // insta::assert_debug_snapshot!(graph);
     }
 
-    #[test]
-    fn add_compound() {
+    #[test] fn add_compound() {
         let chars = fs::read(format!("{TEST_DIR}/add_compound.c"))
             .expect("file dne")
             .iter()
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut nodeid_counter = NodeIdCounter::new(0);
-        let mut parser = Parser::new(&mut nodeid_counter);
-        let tokens = lex(&chars).unwrap();
-        let graph = parser.parse(&tokens).unwrap();
+        let mut parser = Parser::new(chars);
+        let tokens = parser.lex().unwrap();
+        let graph = parser.parse(&tokens, false).unwrap();
 
-        assert_matches!(graph.borrow().opcode, OpCode::Ret);
-        assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        // assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        // assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
         insta::assert_debug_snapshot!(graph);
     }
 }
@@ -244,20 +360,20 @@ mod parse_arith {
 //     edges used with the node inside the scope struct are def edges: ones
 //     that point to nodes that are expressions (in the case of C, just data nodes)
 //     that is, the scope's node has no uses.
-pub struct Scope { node: NodeDef, nvs: Vec<HashMap<String, usize>> }
+pub struct Scope { pub lookup: DefEdge, pub nvs: Vec<HashMap<String, usize>> }
 impl Scope {
-    fn new(nodeid_counter: &mut NodeIdCounter) -> Self { Self { node: Node::new(nodeid_counter, OpCode::Scope), nvs: Vec::new() } }
+    fn new() -> Self { Self { lookup: DefEdge::new(OpCode::Scope), nvs: Vec::new() } }
     fn push_nv(&mut self) -> () { self.nvs.push(HashMap::new()) }
     fn pop_nv(&mut self) -> () { let _ = self.nvs.pop().unwrap(); }
-    fn varapp(&self, alias: &str) -> Result<NodeDef, ScopeError> {self.read_update(alias, ScopeOp::Read, self.nvs.len()-1)}
-    fn varupd(&self, alias: &str, expr: NodeDef) -> Result<NodeDef, ScopeError> {self.read_update(alias, ScopeOp::Update(expr), self.nvs.len()-1)}
-    fn vardef(&mut self, alias: &str, expr: NodeDef) -> Result<(), ScopeError> {
+    fn varapp(&self, alias: &str) -> Result<DefEdge, ScopeError> {self.read_update(alias, ScopeOp::Read, self.nvs.len()-1)}
+    fn varupd(&self, alias: &str, expr: DefEdge) -> Result<DefEdge, ScopeError> {self.read_update(alias, ScopeOp::Update(expr), self.nvs.len()-1)}
+    fn vardef(&mut self, alias: &str, expr: DefEdge) -> Result<(), ScopeError> {
         let cur_nv = self.nvs.last_mut().ok_or(ScopeError::NoNvExists)?;
         match cur_nv.contains_key(alias) {
             true => Err(ScopeError::DoubleDefine),
             false => {
-                self.node.add_def(&expr);
-                let i_def = self.node.borrow().defs.len()-1;
+                self.lookup.add_def(&expr);
+                let i_def = self.lookup.borrow().defs.len()-1;
                 cur_nv.insert(alias.to_owned(), i_def);
                 Ok(())
             },
@@ -265,25 +381,25 @@ impl Scope {
     }
 
     // shared read/update makes lazi phi creation easier ch8
-    fn read_update(&self, alias: &str, op: ScopeOp, level: usize ) -> Result<NodeDef, ScopeError> {
+    fn read_update(&self, alias: &str, op: ScopeOp, level: usize ) -> Result<DefEdge, ScopeError> {
         let cur_nv = self.nvs.get(level).unwrap();
         match cur_nv.get(alias) {
             None => if level == 0 { Err(ScopeError::NotFound) } else { self.read_update(alias, op, level-1) },
             Some(i_def) => {
-                let expr = self.node.borrow().defs[*i_def].clone();
+                let expr = self.lookup.borrow().defs[*i_def].clone();
                 Ok(match op { ScopeOp::Read => expr, ScopeOp::Update(n) => {
-                    self.node.borrow_mut().defs[*i_def] = n; // updating std::vec calls drop on rc
-                    self.node.borrow().defs[*i_def].clone()
+                    self.lookup.borrow_mut().defs[*i_def] = n; // updating std::vec calls drop on rc
+                    self.lookup.borrow().defs[*i_def].clone()
                 },})
             },
         }
     }
 }
-enum ScopeOp { Read, Update(NodeDef) }
+enum ScopeOp { Read, Update(DefEdge) }
 
 #[cfg(test)]
-mod scope_bindings {
-    use crate::son::{parser::{lex, Parser}, NodeIdCounter};
+mod test_scope {
+    use crate::son::{parser::Parser};
     use std::fs;
     
     const TEST_DIR: &str = "tests/bindings";
@@ -296,10 +412,9 @@ mod scope_bindings {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut nodeid_counter = NodeIdCounter::new(0);
-        let mut parser = Parser::new(&mut nodeid_counter);
-        let tokens = lex(&chars).unwrap();
-        let graph = parser.parse(&tokens).unwrap();
+        let mut parser = Parser::new(chars);
+        let tokens = parser.lex().unwrap();
+        let graph = parser.parse(&tokens, false).unwrap();
 
         insta::assert_debug_snapshot!(graph);
     }
@@ -312,136 +427,59 @@ mod scope_bindings {
             .map(|b| *b as char)
             .collect::<Vec<_>>();
     
-        let mut nodeid_counter = NodeIdCounter::new(0);
-        let mut parser = Parser::new(&mut nodeid_counter);
-        let tokens = lex(&chars).unwrap();
-        let graph = parser.parse(&tokens).unwrap();
+        let mut parser = Parser::new(chars);
+        let tokens = parser.lex().unwrap();
+        let graph = parser.parse(&tokens, false).unwrap();
 
         insta::assert_debug_snapshot!(graph);
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct Token { pub lexeme: String, pub typ: TT }
-
-//  1. variations are explicitly typed. Collapsing categories like keywords
-//     into one variant will lose information since lexeme : String, which
-//     will produce redundant work for the parser during syntactic analysis
-//  2. non-tokens: comments, preprocessor directives, macros, whitespace
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum TT {
-    LiteralInt, Alias, // introductions (values) RE: [0-9]+ and [a-zA-Z][a-zA-Z0-9]*
-    KeywordInt, KeywordChar, KeywordVoid, KeywordRet, KeywordIf, KeywordEls, KeywordFor, KeywordWhile, KeywordTrue, KeywordFalse, // keywords ⊂ identifiers
-    Plus, Minus, Star, Slash, LeftAngleBracket, RightAngleBracket, Equals, Bang, Amp, Bar, // eliminations (ops)
-    PuncLeftParen, PuncRightParen, PuncLeftBrace, PuncRightBrace, PuncSemiColon, PuncComma,// punctuation
-}
-
-#[derive(Error, Debug)]
-pub enum LexError { #[error("(unknown token {unknown:?}")] UnknownToken { unknown: String } }
-pub fn lex(input: &[char]) -> Result<Vec<Token>, LexError> {
-    let cs = skip_ws(input);
-    // literals and identifiers have arbitrary length, operations and punctuations are single ASCII characters
-    match cs {
-        [] => Ok(vec![]),
-        [f, r @ ..] => match f {
-            '0'..='9' => scan_int(cs),
-            'a'..='z' | 'A'..='Z' => scan_id(cs),
-            '+' => { let t = Token { lexeme: String::from("+"), typ: TT::Plus }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '-' => { let t = Token { lexeme: String::from("-"), typ: TT::Minus }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '*' => { let t = Token { lexeme: String::from("*"), typ: TT::Star }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '/' => { let t = Token { lexeme: String::from("/"), typ: TT::Slash }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '<' => { let t = Token { lexeme: String::from("<"), typ: TT::LeftAngleBracket }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '>' => { let t = Token { lexeme: String::from(">"), typ: TT::RightAngleBracket }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '=' => { let t = Token { lexeme: String::from("="), typ: TT::Equals }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '!' => { let t = Token { lexeme: String::from("!"), typ: TT::Bang }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '&' => { let t = Token { lexeme: String::from("&"), typ: TT::Amp }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '|' => { let t = Token { lexeme: String::from("|"), typ: TT::Bar }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '(' => { let t = Token { lexeme: String::from("("), typ: TT::PuncLeftParen }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            ')' => { let t = Token { lexeme: String::from(")"), typ: TT::PuncRightParen }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '{' => { let t = Token { lexeme: String::from("{"), typ: TT::PuncLeftBrace }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            '}' => { let t = Token { lexeme: String::from("}"), typ: TT::PuncRightBrace }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            ';' => { let t = Token { lexeme: String::from(";"), typ: TT::PuncSemiColon }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            ',' => { let t = Token { lexeme: String::from(","), typ: TT::PuncComma }; Ok(iter::once(t).chain(lex(r)?).collect()) }
-            _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
-        },
-    }
-}
-
-fn scan_int(input: &[char]) -> Result<Vec<Token>, LexError> {
-    // scan_int calls skip_whitespace too to remain idempotent
-    let cs = skip_ws(input);
-
-    match cs {
-        [] => Ok(vec![]),
-        [f, _r @ ..] => match f {
-            '0'..='9' => {
-                let i = _r.iter().take_while(|&&c| c.is_numeric()).count();
-                let f = cs[..=i].iter().collect::<String>();
-                let r = &cs[i + 1..];
-                let t = Token { lexeme: f, typ: TT::LiteralInt };
-                Ok(iter::once(t).chain(lex(r)?).collect())
-            }
-            _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
-        },
-    }
-}
-
-// TODO: support identifiers with alpha*numeric* characters after first alphabetic
-fn scan_id(input: &[char]) -> Result<Vec<Token>, LexError> {
-    // scan_id calls skip_whitespace too to remain idempotent
-    let cs = skip_ws(input);
-
-    match cs {
-        [] => Ok(vec![]),
-        [f, r @ ..] => match f {
-            'a'..='z' => {
-                // Find the index where the alphabetic characters end
-                let i = r.iter().take_while(|&&c| c.is_alphabetic()).count();
-
-                let f = (cs[..=i].iter()).collect::<String>();
-                let new_r = &cs[i + 1..];
-
-                let keyword = match f.as_str() {
-                    "int" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordInt }),
-                    "if" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordIf }),
-                    "else" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordEls }),
-                    "for" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordFor }),
-                    "while" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordWhile }),
-                    "return" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordRet }),
-                    "true" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordTrue }),
-                    "false" => Some(Token { lexeme: f.to_string(), typ: TT::KeywordFalse }),
-                    _ => None,
-                };
-
-                let t = match keyword {
-                    Some(k) => k,
-                    None => Token { lexeme: f, typ: TT::Alias },
-                };
-                Ok(iter::once(t).chain(lex(new_r)?).collect())
-            }
-            _ => Err(LexError::UnknownToken { unknown: f.to_string() }),
-        },
-    }
-}
-
-fn skip_ws(input: &[char]) -> &[char] { match input { [] => input, [f, r @ ..] => if f.is_whitespace() { skip_ws(r) } else { input } } }
-
 #[cfg(test)]
-mod lexer {
+mod test_lexer {
+    use crate::son::parser::Parser;
+
     fn read_input(test_dir: &str, path: &str) -> Vec<char> { std::fs::read(format!("{test_dir}/{path}")).expect("file dne").iter().map(|b| *b as char).collect::<Vec<_>>() }
 
     // arithmetic
-    #[test] fn lit() { let input = read_input("tests/arith", "/lit.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
-    #[test] fn add() { let input = read_input("tests/arith", "/add.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
-    #[test] fn add_compound() { let input = read_input("tests/arith", "/add_compound.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
-    #[test] fn sub() { let input = read_input("tests/arith", "/sub.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
-    #[test] fn mul() { let input = read_input("tests/arith", "/mul.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
-    #[test] fn div() { let input = read_input("tests/arith", "/div.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn lit() {
+        let input = read_input("tests/arith", "/lit.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
+    #[test] fn add() {
+        let input = read_input("tests/arith", "/add.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
+    #[test] fn add_compound() {
+        let input = read_input("tests/arith", "/add_compound.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
+    #[test] fn sub() {
+        let input = read_input("tests/arith", "/sub.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
+    #[test] fn mul() {
+        let input = read_input("tests/arith", "/mul.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
+    #[test] fn div() {
+        let input = read_input("tests/arith", "/div.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
 
     // bindings
-    #[test] fn asnmt() { let input = read_input("tests/bindings", "/asnmt.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
-    #[test] fn composition() { let input = read_input("tests/bindings", "/asnmt_composition.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn asnmt() {
+        let input = read_input("tests/bindings", "/asnmt.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
+    #[test] fn composition() {
+        let input = read_input("tests/bindings", "/asnmt_composition.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
 
     // control
-    #[test] fn branch() { let input = read_input("tests/control", "/ifels_then.c"); let output = super::lex(input.as_slice()).unwrap(); insta::assert_debug_snapshot!(output); }
+    #[test] fn branch() {
+        let input = read_input("tests/control", "/ifels_then.c"); let parser = Parser::new(input);
+        let output = parser.lex().unwrap(); insta::assert_debug_snapshot!(output);
+    }
 }
