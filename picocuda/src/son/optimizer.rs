@@ -1,5 +1,4 @@
 use std::{fmt::Display, mem};
-
 use crate::son::{DefEdge, OpCode};
 
 // types form a symmetric complete bounded (ranked) lattice
@@ -80,100 +79,62 @@ impl DefEdge {
     }
 }
 
-// #[cfg(test)]
-// mod peephole {
-//     use crate::son::{parser::{lex, Parser}, NodeIdCounter, OpCode};
-//     use std::{assert_matches::assert_matches, fs};
+#[cfg(test)]
+mod test_optimizer {
+    use crate::son::{dumper, parser, utils::read_chars};
+    use std::{assert_matches::assert_matches, path::Path};
     
-//     const TEST_DIR: &str = "tests/arith";
+    const TEST_DIR: &str = "tests/arith";
 
-//     #[test]
-//     fn add() {
-//         let chars = fs::read(format!("{TEST_DIR}/add.c"))
-//             .expect("file dne")
-//             .iter()
-//             .map(|b| *b as char)
-//             .collect::<Vec<_>>();
-    
-//         let mut nodeid_counter = NodeIdCounter::new(0);
-//         let mut parser = Parser::new(&mut nodeid_counter);
-//         let tokens = lex(&chars).unwrap();
-//         let graph = parser.parse(&tokens, false).unwrap();
+    #[test]
+    fn add() {
+        let chars = read_chars(Path::new(&format!("{TEST_DIR}/add.c")));
+        let graph = parser::parse(&chars).unwrap();
+        let dot = dumper::dump_dot(&chars, &graph).unwrap();
+        println!("{dot}");
 
-//         assert_matches!(graph.borrow().opcode, OpCode::Ret);
-//         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-//         insta::assert_debug_snapshot!(graph);
-//     }
+        // assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        // assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        // insta::assert_debug_snapshot!(graph);
+    }
 
-//     #[test]
-//     fn sub() {
-//         let chars = fs::read(format!("{TEST_DIR}/sub.c"))
-//             .expect("file dne")
-//             .iter()
-//             .map(|b| *b as char)
-//             .collect::<Vec<_>>();
-    
-//         let mut nodeid_counter = NodeIdCounter::new(0);
-//         let mut parser = Parser::new(&mut nodeid_counter);
-//         let tokens = lex(&chars).unwrap();
-//         let graph = parser.parse(&tokens, false).unwrap();
+    #[test]
+    fn sub() {
+        let chars = read_chars(Path::new(&format!("{TEST_DIR}/sub.c")));
+        let graph = parser::parse(&chars).unwrap();
 
-//         assert_matches!(graph.borrow().opcode, OpCode::Ret);
-//         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-//         insta::assert_debug_snapshot!(graph);
-//     }
+        // assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        // assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        // insta::assert_debug_snapshot!(graph);
+    }
 
-//     #[test]
-//     fn mul() {
-//         let chars = fs::read(format!("{TEST_DIR}/mul.c"))
-//             .expect("file dne")
-//             .iter()
-//             .map(|b| *b as char)
-//             .collect::<Vec<_>>();
-    
-//         let mut nodeid_counter = NodeIdCounter::new(0);
-//         let mut parser = Parser::new(&mut nodeid_counter);
-//         let tokens = lex(&chars).unwrap();
-//         let graph = parser.parse(&tokens, false).unwrap();
+    #[test]
+    fn mul() {
+        let chars = read_chars(Path::new(&format!("{TEST_DIR}/mul.c")));
+        let graph = parser::parse(&chars).unwrap();
 
-//         assert_matches!(graph.borrow().opcode, OpCode::Ret);
-//         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-//         insta::assert_debug_snapshot!(graph);
-//     }
+        // assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        // assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        // insta::assert_debug_snapshot!(graph);
+    }
 
-//     #[test]
-//     fn div() {
-//         let chars = fs::read(format!("{TEST_DIR}/div.c"))
-//             .expect("file dne")
-//             .iter()
-//             .map(|b| *b as char)
-//             .collect::<Vec<_>>();
-    
-//         let mut nodeid_counter = NodeIdCounter::new(0);
-//         let mut parser = Parser::new(&mut nodeid_counter);
-//         let tokens = lex(&chars).unwrap();
-//         let graph = parser.parse(&tokens, false).unwrap();
+    #[test]
+    fn div() {
+        let chars = read_chars(Path::new(&format!("{TEST_DIR}/div.c")));
+        let graph = parser::parse(&chars).unwrap();
 
-//         assert_matches!(graph.borrow().opcode, OpCode::Ret);
-//         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-//         insta::assert_debug_snapshot!(graph);
-//     }
+        // assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        // assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        // insta::assert_debug_snapshot!(graph);
+    }
 
-//     #[test]
-//     fn add_compound() {
-//         let chars = fs::read(format!("{TEST_DIR}/add_compound.c"))
-//             .expect("file dne")
-//             .iter()
-//             .map(|b| *b as char)
-//             .collect::<Vec<_>>();
-    
-//         let mut nodeid_counter = NodeIdCounter::new(0);
-//         let mut parser = Parser::new(&mut nodeid_counter);
-//         let tokens = lex(&chars).unwrap();
-//         let graph = parser.parse(&tokens, false).unwrap();
+    #[test]
+    fn add_compound() {
+        let chars = read_chars(Path::new(&format!("{TEST_DIR}/add_compound.c")));
+        let graph = parser::parse(&chars).unwrap();
 
-//         assert_matches!(graph.borrow().opcode, OpCode::Ret);
-//         assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
-//         insta::assert_debug_snapshot!(graph);
-//     }
-// }
+        // assert_matches!(graph.borrow().opcode, OpCode::Ret);
+        // assert_matches!(graph.borrow().defs[0].borrow().opcode, OpCode::Start);
+        // insta::assert_debug_snapshot!(graph);
+    }
+}

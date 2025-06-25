@@ -5,6 +5,7 @@ pub mod generator;
 pub mod optimizer;
 pub mod parser;
 pub mod dumper;
+pub mod utils;
 
 use std::{cell::RefCell, collections::VecDeque, fmt::{Debug, Display}, ops::Deref, rc::{Rc, Weak}};
 use thiserror::Error;
@@ -15,16 +16,11 @@ use crate::son::optimizer::Type;
 static mut NODEID_COUNTER: usize = 0;
 pub fn generate_nodeid() -> usize { unsafe { NODEID_COUNTER += 1; NODEID_COUNTER } }
 
-// pub fn driver() -> () {
-//     let mut parser = Parser::new(&mut nodeid_counter);
-//     let _ = parser.parse(&vec![], true);
-// }
-
 // some code in simple relies on invariant that first edge is control.
 // this is removed for now so edge type is not optioned. watch out for this.
 // removed: matched on the opcode. if add/sub/etc set self.defs[0] to none}
 
-// TODO: is matching on opcode slow vs dynamic dispatch with vtables?
+// TODO: is dynamic matching on opcode too slow vs dynamic dispatch with vtables (trait items) or static __ with generics?
 #[derive(Clone, Copy)] pub enum OpCode { Start, Ret, Con, Add, Sub, Mul, Div, Scope }
 pub struct Node { id: usize, pub opcode: OpCode, typ: Type, defs: VecDeque<DefEdge>, uses: VecDeque<UseEdge> }
 #[derive(Error, Debug)] pub enum NodeError { #[error("use not found")] UseNotFound }
@@ -32,7 +28,6 @@ pub struct Node { id: usize, pub opcode: OpCode, typ: Type, defs: VecDeque<DefEd
 //     - the order of defs has semantic meaning. order of uses does not.
 //       q: what's the point of maintaining D->U edges? (aka outputs/uses)
 
-enum Edge { DefEdge(Rc<RefCell<Node>>), UseEdge(Weak<RefCell<Node>>) } // TODO: remove?
 pub struct DefEdge(Rc<RefCell<Node>>); pub struct UseEdge(Weak<RefCell<Node>>);
 impl Display for DefEdge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

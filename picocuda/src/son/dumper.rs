@@ -1,14 +1,14 @@
 use std::{collections::{HashMap}, fmt::{self, Write}};
-use crate::son::{parser::{Parser, Scope}, DefEdge, OpCode};
+use crate::son::{parser::{ParseResult, Scope}, DefEdge, OpCode};
 
-pub fn dump_dot(parser: &Parser) -> Result<String, fmt::Error> {
+pub fn dump_dot(char_input: &[char], graph_output: &ParseResult) -> Result<String, fmt::Error> {
     let mut dump = String::new();
     write!(dump, "digraph {{\n")?;
-    write!(dump, "/*\n")?; write!(dump, "{}", parser.src_raw.iter().collect::<String>())?; write!(dump, "\n*/\n")?;
+    write!(dump, "/*\n")?; write!(dump, "{}", char_input.iter().collect::<String>())?; write!(dump, "\n*/\n")?;
     write!(dump, "\trankdir=BT;\n")?; // force nodes before scopes
     write!(dump, "\tordering=\"in\";\n")?; // preserve node input order
     write!(dump, "\tconcentrate=\"true\";\n")?; // merge multiple edges hitting the same node
-    let g_flat = flatten(&parser);
+    let g_flat = flatten(graph_output);
 
     dump_nodes(&mut dump, &g_flat)?;
     // dump_scope(&mut dump, &parser.scope)?;
@@ -46,10 +46,10 @@ fn dump_node_edges(s: &mut String, g_flat: &Vec<DefEdge>) -> fmt::Result {
 fn _dump_scope(s: &mut String, scope: &Scope) -> fmt::Result { todo!() }
 fn _dump_scope_edges(s: &mut String, scope: &Scope) -> fmt::Result { todo!() }
 
-fn flatten(parser: &Parser) -> Vec<DefEdge> {
+fn flatten(parsed: &ParseResult) -> Vec<DefEdge> {
     let mut seen = HashMap::new();
-    traverse_graph_from_node(&parser.start, &mut seen);
-    traverse_scope_bindings(&parser.scope, &mut seen);
+    traverse_graph_from_node(&parsed.start, &mut seen);
+    traverse_scope_bindings(&parsed.scope, &mut seen);
     seen.values().cloned().collect::<Vec<_>>()
 }
 
