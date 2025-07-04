@@ -1,4 +1,4 @@
-use crate::ast::{MachPrg, AbsPrg, R5MachInstr, R5OpCode, CallingConvention, Expr, Stmt, CPU};
+use crate::cfg::{MachPrg, AbsPrg, R5MachInstr, R5OpCode, CallingConvention, Expr, Stmt, CPU};
 
 pub fn select(prg: AbsPrg, cpu: CPU, _cc: CallingConvention) -> MachPrg { match cpu {
     CPU::R5 => MachPrg::R5(select_r5stmt(prg)),

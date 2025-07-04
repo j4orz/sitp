@@ -31,7 +31,7 @@ pub fn compile(src: &Path) -> Result<(), CompileError> {
     let _ = typer::typ()?;
     let aasmtree = selector::select(ast, CPU::R5, CallingConvention::SystemV);
     let asmtree = allocator::allocate(aasmtree);
-    let machcode = encoder::encode(aasmtree);
+    let machcode = encoder::encode(asmtree);
     let elf = exporter::export(machcode, Format::Executable);
     // TODO: write elf to disk
     Ok(())

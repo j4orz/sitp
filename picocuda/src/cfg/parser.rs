@@ -1,5 +1,5 @@
 use std::path::Path;
-use crate::ast::AbsPrg;
+use crate::cfg::AbsPrg;
 
 pub fn parse(src: &Path) -> AbsPrg {
     todo!()

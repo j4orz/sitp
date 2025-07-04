@@ -8,19 +8,19 @@ pub fn dump_dot(char_input: &[char], graph_output: &ParseResult) -> Result<Strin
     write!(dump, "\trankdir=BT;\n")?; // force nodes before scopes
     write!(dump, "\tordering=\"in\";\n")?; // preserve node input order
     write!(dump, "\tconcentrate=\"true\";\n")?; // merge multiple edges hitting the same node
-    let g_flat = flatten(graph_output);
+    let flat_graph = flatten(graph_output);
 
-    dump_nodes(&mut dump, &g_flat)?;
-    // dump_scope(&mut dump, &parser.scope)?;
-    dump_node_edges(&mut dump, &g_flat)?;
+    dump_nodes(&mut dump, &flat_graph)?;
+    dump_scope(&mut dump, &graph_output.scope)?;
+    dump_node_edges(&mut dump, &flat_graph)?;
     // dump_scope_edges(&mut dump, &parser.scope)?;
     write!(dump, "}}\n")?;
     Ok(dump)
 }
 
-fn dump_nodes(s: &mut String, g_flat: &Vec<DefEdge>) -> fmt::Result {
+fn dump_nodes(s: &mut String, flat_graph: &Vec<DefEdge>) -> fmt::Result {
     write!(s, "\tsubgraph cluster_Nodes {{\n")?;
-    for node in g_flat {
+    for node in flat_graph {
         if let OpCode::Scope = node.borrow().opcode { continue }
         write!(s, "\t\t{} [ ", node.unique_label())?;
         if node.is_cfg() { write!(s, "shape=box style=filled fillcolor=yellow ")?; } // default is ellipse
@@ -29,9 +29,9 @@ fn dump_nodes(s: &mut String, g_flat: &Vec<DefEdge>) -> fmt::Result {
     }
     write!(s, "\t}}\n")
 }
-fn dump_node_edges(s: &mut String, g_flat: &Vec<DefEdge>) -> fmt::Result {
+fn dump_node_edges(s: &mut String, flat_graph: &Vec<DefEdge>) -> fmt::Result {
     write!(s, "\tedge [ fontname=Helvetica, fontsize=8 ];\n")?;
-    for node in g_flat {
+    for node in flat_graph {
         if let OpCode::Scope = node.borrow().opcode { continue }
         for (i, def) in (&node.borrow().defs).iter().enumerate() {
             write!(s, "\t{} -> {}", node.unique_label(), def.unique_label())?; // unique labels for DOT (display not enough)
@@ -43,7 +43,25 @@ fn dump_node_edges(s: &mut String, g_flat: &Vec<DefEdge>) -> fmt::Result {
     }
     Ok(())
 }
-fn _dump_scope(s: &mut String, scope: &Scope) -> fmt::Result { todo!() }
+
+fn build_scopename() -> String { todo!() }
+fn build_portname() -> String { todo!() }
+fn dump_scope(s: &mut String, scope: &Scope) -> fmt::Result {
+    write!(s, "\tnode [shape=plaintext];\n")?;
+    for (i, nv) in (&scope.nvs).iter().enumerate() {
+        let scope_name = "";
+        write!(s, "\tsubgraph cluster_{scope_name} {{\n")?;
+        write!(s, "\t\t{scope_name} [label=<\n")?;
+
+        write!(s, "\t\t\t<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">\n");
+        write!(s, "\t\t\t<TR><TD BGCOLOR=\"cyan\">{i}</TD>")?; // add scope level
+        // for alias in nv.keys() {write !(s, "<TD PORT=\"{port_name}\">{alias}</TD>")?; }
+        write!(s, "</TR>\n");
+        write!(s, "\t\t\t</TABLE>>];\n");
+    }
+    // write!(s, "\t}\n".repeat( level ) ); // End all Scope clusters
+    Ok(())
+}
 fn _dump_scope_edges(s: &mut String, scope: &Scope) -> fmt::Result { todo!() }
 
 fn flatten(parsed: &ParseResult) -> Vec<DefEdge> {

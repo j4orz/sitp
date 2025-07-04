@@ -1,6 +1,8 @@
 // TODOs (day5)
 // - ir dump ascii/graphviz, then finish scope tests
+// - remove golden tests for graphs: the expected graph changes too often on peephole additions
 // - disable peephole (-O0)
+// - ssa
 pub mod generator;
 pub mod optimizer;
 pub mod parser;
