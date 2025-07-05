@@ -1,6 +1,6 @@
-use std::path::Path;
-use crate::ast::AbsPrg;
+use std::{io::Write};
+use crate::ast::Ast;
 
-pub fn parse(src: &Path) -> AbsPrg {
+pub fn parse<W: Write>(w: W) -> Ast {
     todo!()
 }

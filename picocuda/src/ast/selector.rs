@@ -1,12 +1,12 @@
-use crate::ast::{MachPrg, AbsPrg, R5MachInstr, R5OpCode, CallingConvention, Expr, Stmt, CPU};
+use crate::ast::{MachPrg, Ast, R5MachInstr, R5OpCode, CallingConvention, Expr, Stmt, CPU};
 
-pub fn select(prg: AbsPrg, cpu: CPU, _cc: CallingConvention) -> MachPrg { match cpu {
+pub fn select(prg: Ast, cpu: CPU, _cc: CallingConvention) -> MachPrg { match cpu {
     CPU::R5 => MachPrg::R5(select_r5stmt(prg)),
     CPU::ARM => unimplemented!(),
     CPU::X86 => unimplemented!()
 }}
 
-pub fn select_r5stmt(prg: AbsPrg) -> Vec<R5MachInstr> {
+pub fn select_r5stmt(prg: Ast) -> Vec<R5MachInstr> {
     let mut aasm = vec![];
 
     for s in prg { match s {

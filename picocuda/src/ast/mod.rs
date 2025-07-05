@@ -5,12 +5,12 @@ pub mod allocator;
 pub mod encoder;
 pub mod exporter;
 
-use std::path::Path;
+use std::{fs::File, io, path::Path};
 use thiserror::Error;
 use crate::ast::{exporter::Format, typer::TypeError};
 
-///////////////////////////// SOURCE (C89 subset) //////////////////////////////
-pub type AbsPrg = Vec<Stmt>; pub enum Stmt { Ret(Expr) }
+////////////////////////////////// SOURCE (C0) //////////////////////////////////
+pub type Ast = Vec<Stmt>; pub enum Stmt { Ret(Expr) }
 pub enum Expr {
     Con(i128),
     Add(Box<Expr>, Box<Expr>),
@@ -24,15 +24,17 @@ pub enum Expr {
 
 ////////////////////////// COMPILER: SOURCE -> TARGET //////////////////////////
 #[derive(Error, Debug)] pub enum CompileError {
+    #[error("i/o error")] IOError(#[from] io::Error),
     #[error("type error")] TypeError(#[from] TypeError)
 }
 pub fn compile(src: &Path) -> Result<(), CompileError> {
-    let ast = parser::parse(src);
+    let (src_c0, dst_r5) = (File::open("hello.c")?, File::create("foo.txt")?);
+    let ast = parser::parse(src_c0);
     let _ = typer::typ()?;
     let aasmtree = selector::select(ast, CPU::R5, CallingConvention::SystemV);
     let asmtree = allocator::allocate(aasmtree);
     let machcode = encoder::encode(asmtree);
-    let elf = exporter::export(machcode, Format::Executable);
+    let elf = exporter::export(machcode, Format::Executable, dst_r5);
     // TODO: write elf to disk
     Ok(())
 }
@@ -52,7 +54,7 @@ pub enum R5OpCode { // TARGET R5
     Int, Int8, Add, AddI, Sub, Lui, Auipc, // arithmetic 
     Ret
 }
-struct R5MachInstr {
+pub struct R5MachInstr {
     // NB: machine instruction maintains retains semantic facts discovered/generated
     //     so 1. use->def facts (operands) and 2. registers (vreg/phyreg)
     opcode: R5OpCode, operands: Box<[R5MachInstr]>, // Box<[]> keeps children operands fixed arity

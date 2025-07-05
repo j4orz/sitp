@@ -1,32 +1,33 @@
-use crate::cfg::{MachPrg, AbsPrg, R5MachInstr, R5OpCode, CallingConvention, Expr, Stmt, CPU};
+use bril::Program;
+use crate::cfg::{MachPrg, R5MachInstr, R5OpCode, CallingConvention, CPU};
 
-pub fn select(prg: AbsPrg, cpu: CPU, _cc: CallingConvention) -> MachPrg { match cpu {
+pub fn select(prg: Program, cpu: CPU, _cc: CallingConvention) -> MachPrg { match cpu {
     CPU::R5 => MachPrg::R5(select_r5stmt(prg)),
     CPU::ARM => unimplemented!(),
     CPU::X86 => unimplemented!()
 }}
 
-pub fn select_r5stmt(prg: AbsPrg) -> Vec<R5MachInstr> {
+pub fn select_r5stmt(prg: Program) -> Vec<R5MachInstr> {
     let mut aasm = vec![];
 
-    for s in prg { match s {
-        Stmt::Ret(e) => {
-            let expr = select_r5expr(e);
-            let operands = Box::new([expr]);
-            let ret = R5MachInstr::new(R5OpCode::Ret, operands);
-            aasm.push(ret)
-        },
-    }}
+    // for s in prg { match s {
+    //     Stmt::Ret(e) => {
+    //         let expr = select_r5expr(e);
+    //         let operands = Box::new([expr]);
+    //         let ret = R5MachInstr::new(R5OpCode::Ret, operands);
+    //         aasm.push(ret)
+    //     },
+    // }}
     aasm
 }
 
-fn select_r5expr(e: Expr) -> R5MachInstr { match e {
-    Expr::Con(c) => r5con(c),
-    Expr::Add(_, _) => r5add(),
-    Expr::Sub(_, _) => r5sub(),
-    Expr::Mul(_, _) => r5mul(),
-    Expr::Div(_, _) => r5div(),
-}}
+// fn select_r5expr(e: Expr) -> R5MachInstr { match e {
+//     Expr::Con(c) => r5con(c),
+//     Expr::Add(_, _) => r5add(),
+//     Expr::Sub(_, _) => r5sub(),
+//     Expr::Mul(_, _) => r5mul(),
+//     Expr::Div(_, _) => r5div(),
+// }}
 
 fn r5con(c: i128) -> R5MachInstr {
     let operands = Box::new([]);

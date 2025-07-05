@@ -1,74 +1,97 @@
-pub mod parser;
-pub mod typer;
-pub mod selector;
-pub mod allocator;
-pub mod encoder;
-pub mod exporter;
-
-use std::path::Path;
+use std::{fs::File, io, path::Path};
+use bril::load_program_from_read;
 use thiserror::Error;
-use crate::cfg::{exporter::Format, typer::TypeError};
+use crate::cfg::exporter::Format;
 
-///////////////////////////// SOURCE (C89 subset) //////////////////////////////
-pub type AbsPrg = Vec<Stmt>; pub enum Stmt { Ret(Expr) }
-pub enum Expr {
-    Con(i128),
-    Add(Box<Expr>, Box<Expr>),
-    Sub(Box<Expr>, Box<Expr>),
-    Mul(Box<Expr>, Box<Expr>),
-    Div(Box<Expr>, Box<Expr>)
-}
-
-struct BB {
-    straightline: Vec<Stmt>
-
-}
-////////////////////////////////////////////////////////////////////////////////
+//          data(types) | algo(impls)
+//          ------------|-----------
+// OLD    =    same     |   same
+// MOD    =    same     |   mod
+// NEW    =    same     |   new
 
 
-////////////////////////// COMPILER: SOURCE -> TARGET //////////////////////////
-#[derive(Error, Debug)] pub enum CompileError {
-    #[error("type error")] TypeError(#[from] TypeError)
-}
+
+
+
+// 1. HIGH LEVEL BLOCK DIAGRAM
+//                  __________________________________________________________________
+//                  |     sem                      opt                  gen          |
+//                  |   ____________             ________         ________________   |
+//                  |   |      ast |             | cfg--|-->cfg-->|\ isel/isched |   |             ____
+//     o            |   |type  / \ |             | /    |         | \ ra         |   |            ||""||
+//  _ /<. -->c0 u8--|-->|parse/   \|-->bril u8-->|/     |         |  \ enc--exp--|---|-->r5 elf-->||__||
+// (*)>(*)          |   -----------              --------         ----------------   |            [ -=.]`)
+//                  |   OLD front(1)            NEW mid(2)      UPDATED back(3)      |            ====== 0
+//                  -----------------------------------------------------------------|
+//
+//                                            PICOC
+
+
+
+
+
+
+
+
+
+
+
+// 2. ALGORITHMS + DATA STRUCTURES
+
+// ==================================ALGORITHMS=================================
+use crate::ast::{self, parser, typer}; // OLD front(1)
+                                       // NEW mid(2)
+pub mod selector; pub mod allocator; pub mod encoder; pub mod exporter; // MOD back(3)
+
+
+
+// =============================DATA STRUCTURES=================================
+use crate::ast::Ast; //  OLD SOURCE (C0)
+
+struct BB { entry: Instr, instrs: Vec<Instr>, exit: Instr, } // NEW IR: CFG(BB)+SSA
+struct Instr {}
+
+use crate::ast::{CPU, MachPrg, R5OpCode, R5MachInstr, CallingConvention}; // OLD TARGET: {R5,ARM,x86}
+// =============================================================================
+
+
+
+
+
+
+
+
+
+
+
+// 3. ALGORITHMS + DATA STRUCTURES = PROGRAMS ;)
 pub fn compile(src: &Path) -> Result<(), CompileError> {
-    let ast = parser::parse(src);
+    let (src_c0, dst_r5) = (File::open("hello.c")?, File::create("foo.txt")?);
+
+    // (1)
+    let ast = parser::parse(src_c0);
     let _ = typer::typ()?;
-    let aasmtree = selector::select(ast, CPU::R5, CallingConvention::SystemV);
+
+    // (2)
+    let bril_file = File::open("bril")?; // TODO: stdin?
+    let bril = load_program_from_read(bril_file);
+    // -local opts
+    // -regional opts
+    // -intraproc opts
+    // -interproc opts
+
+    
+    // (3)
+    let aasmtree = selector::select(bril, CPU::R5, CallingConvention::SystemV);
     let asmtree = allocator::allocate(aasmtree);
     let machcode = encoder::encode(asmtree);
-    let elf = exporter::export(machcode, Format::Executable);
+    let elf = exporter::export(machcode, Format::Executable, dst_r5);
+
     // TODO: write elf to disk
     Ok(())
 }
-////////////////////////////////////////////////////////////////////////////////
 
-
-
-///////////////////////// TARGET: {R5,ARM,x86} subset //////////////////////////
-pub enum CPU { R5, ARM, X86 } pub enum CallingConvention { SystemV }
-pub enum MachPrg { R5(Vec<R5MachInstr>), ARM(Vec<ARMInstr>), X86(Vec<X86Instr>) }
-// NB: parallelizing the compiler requires moving the static mutable counter into TLS
-//     also skipping 0 since node ids show up in bit vectors, work lists, etc.
-static mut VREG_COUNTER: u32 = 0;
-pub fn generate_vreg() -> u32 { unsafe { VREG_COUNTER += 1; VREG_COUNTER } }
-
-pub enum R5OpCode { // TARGET R5
-    Int, Int8, Add, AddI, Sub, Lui, Auipc, // arithmetic 
-    Ret
+#[derive(Error, Debug)] pub enum CompileError {
+    #[error("i/o error")] IOError(#[from] io::Error),
+    #[error("type error")] TypeError(#[from] ast::typer::TypeError)
 }
-struct R5MachInstr {
-    // NB: machine instruction maintains retains semantic facts discovered/generated
-    //     so 1. use->def facts (operands) and 2. registers (vreg/phyreg)
-    opcode: R5OpCode, operands: Box<[R5MachInstr]>, // Box<[]> keeps children operands fixed arity
-    vreg: u32, phyreg: Option<u32>,
-}
-impl R5MachInstr {
-    fn new(opcode: R5OpCode, operands: Box<[R5MachInstr]>) -> Self {
-        Self { opcode, operands, vreg: generate_vreg(), phyreg: None, }
-    }
-}
-
-pub enum ARMInstr {} // TARGET ARM
-
-pub enum X86Instr {} // TARGET x86
-////////////////////////////////////////////////////////////////////////////////
