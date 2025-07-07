@@ -29,13 +29,13 @@ pub fn select_r5stmt(prg: Program) -> Vec<R5MachInstr> {
 //     Expr::Div(_, _) => r5div(),
 // }}
 
-fn r5con(c: i128) -> R5MachInstr {
-    let operands = Box::new([]);
-    if imm12(c) { R5MachInstr::new(R5OpCode::Int, operands) }
-    else if imm20exact(c) { R5MachInstr::new(R5OpCode::Lui, operands) }
-    else if imm32(c) { R5MachInstr::new(R5OpCode::AddI, operands) }
-    else { R5MachInstr::new(R5OpCode::Int8, operands) }
-}
+// fn r5con(c: i128) -> R5MachInstr {
+//     let operands = Box::new([]);
+//     if imm12(c) { R5MachInstr::new(R5OpCode::Int, operands) }
+//     else if imm20exact(c) { R5MachInstr::new(R5OpCode::Lui, operands) }
+//     else if imm32(c) { R5MachInstr::new(R5OpCode::AddI, operands) }
+//     else { R5MachInstr::new(R5OpCode::Int8, operands) }
+// }
 
 fn r5add() -> R5MachInstr { todo!() }
 fn r5sub() -> R5MachInstr { todo!() }
