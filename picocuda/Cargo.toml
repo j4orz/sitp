@@ -1,3 +1,5 @@
+cargo-features = ["edition2024"]
+
 [package]
 name = "picoc"
 version = "0.1.0"
@@ -5,6 +7,6 @@ edition = "2024"
 
 [dependencies]
 thiserror = "2.0.12"
-bril = { git = "https://github.com/sampsyo/bril", package = "bril-rs" }
+bril = { path = "vendor/bril/bril-rs", package = "bril-rs" }
 [dev-dependencies]
 insta = "1.43.1"
