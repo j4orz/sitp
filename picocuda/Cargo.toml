@@ -7,6 +7,7 @@ edition = "2024"
 
 [dependencies]
 thiserror = "2.0.12"
-bril = { path = "vendor/bril/bril-rs", package = "bril-rs" }
+bril = { git = "https://github.com/sampsyo/bril", package = "bril-rs" }
+
 [dev-dependencies]
 insta = "1.43.1"
