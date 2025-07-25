@@ -1,63 +1,54 @@
-use std::collections::{BinaryHeap, HashMap};
-
-struct UnionFind {}
+use core::hash::Hash;
 
 // =============================================================================
 // ALGORITHMS ==================================================================
 // =============================================================================
-
 pub trait Graph {
-    type NodeRef<'a>;
-    type EdgeRef<'a>;
+    type NodeId: Hash;
+    fn nodes(&self) -> impl Iterator<Item=Self::NodeId>;
 
-    type NodeRefs<'a>: Iterator<Item=Self::NodeRef<'a>>;
-    type EdgeRefs<'a>: Iterator<Item=Self::EdgeRef<'a>>;
+    // NB: .neighbors(v: NodeId) returns nodes u_1,...,un adjacent to v
+    //     .edges(v: NodeId)     returns (v,u_1),...,(v,u_n)
+    fn neighbors(&self, v: Self::NodeId) -> impl Iterator<Item=Self::NodeId>;
+    fn edges(&self, v: Self::NodeId) -> impl Iterator<Item=(Self::NodeId, Self::NodeId)>;
 
-    fn min_spanning_tree(&self) -> MST<Self> where Self: Sized {
-        MST { g: todo!(), subgraphs: todo!(), edgeheap: todo!(), nodemap: todo!() }
+    fn into_bfs(self) -> IntoBfs<Self>
+    where Self: Sized {
+        IntoBfs { g: self  }
     }
 
-    fn sssp(&self) -> SSSP { todo!() }
-    fn apsp(&self) -> APSP { todo!() }
+    fn bfs(&self) -> Bfs<'_, Self>
+    where Self: Sized {
+        Bfs { g: self }
+    }
+
+    fn bfs_mut(&mut self) -> BfsMut<'_, Self>
+    where Self: Sized {
+        BfsMut { g: self }
+    }
 }
 
+pub struct IntoBfs<G: Graph> { g: G }
+pub struct Bfs<'a, G: Graph> { g: &'a G }
+pub struct BfsMut<'a, G: Graph> { g: &'a mut G }
 
+impl<G: Graph> Iterator for IntoBfs<G> {
+    type Item = G::NodeId;
 
-
-struct SSSP {} // ______________________________________________________________
-impl Iterator for SSSP {
-    type Item = ();
-
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
-} // ___________________________________________________________________________
-
-
-
-struct APSP {} // ______________________________________________________________
-impl Iterator for APSP {
-    type Item = ();
-
-    fn next(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
-} // ___________________________________________________________________________
-
-
-
-struct MST<'a, G: Graph + ?Sized> { // _________________________________________
-    g: &'a G,
-    subgraphs: UnionFind,
-    edgeheap: BinaryHeap<()>,
-    nodemap: HashMap<(),()>
-}
-
-impl<'a, G: Graph + Sized> Iterator for MST<'a, G> {
-    type Item = i32;
     fn next(&mut self) -> Option<Self::Item> { todo!() }
 }
-// _____________________________________________________________________________
+
+impl<'a, G: Graph> Iterator for Bfs<'_, G> {
+    type Item = G::NodeId;
+
+    fn next(&mut self) -> Option<Self::Item> { todo!() }
+}
+
+impl<'a, G: Graph> Iterator for BfsMut<'_, G> {
+    type Item = G::NodeId;
+
+    fn next(&mut self) -> Option<Self::Item> { todo!() }
+}
 
 
 
@@ -74,15 +65,6 @@ impl<'a, G: Graph + Sized> Iterator for MST<'a, G> {
 
 // TRAITS ______________________________________________________________________
 
-impl<V, E> Graph for AdjacencyList<V, E> {
-    type NodeRef<'a>;
-
-    type EdgeRef<'a>;
-
-    type NodeRefs<'a>;
-
-    type EdgeRefs<'a>;
-}
 
 // TODO: marker traits?
 // _____________________________________________________________________________
