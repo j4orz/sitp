@@ -79,29 +79,21 @@ impl<N, E> Graph for AdjLinkedList<N, E> {
 
 #[derive(Clone, Copy, PartialEq)] pub struct NodeIndex(usize);
 #[derive(Clone, Copy, PartialEq)] pub struct EdgeIndex(usize);
+// size, alignment of Option<usize> is ... NPO...
+// TODO: Nethercote. measure.
+pub const INVALID_EDGE_INDEX: EdgeIndex = EdgeIndex(usize::MAX);
+const OUTGOING: usize = 0;
+const INCOMING: usize = 1;
 
-struct Node<N> { data: N, first: [EdgeIndex; 2] }
-struct Edge<E> { data: E, src: NodeIndex, tgt: NodeIndex, next: [EdgeIndex; 2] }
-pub struct AdjLL<N, E> { nodes: Vec<Node<N>>, edges: Vec<Edge<E>> }
-//      ┌───────────── Nodes Vec ─────────────┐
-// Idx  │ first_out   first_in                │
-// ─────┼─────────────────────────────────────┤
-//  0   │   0  ───► e0   3  ───► e3           │   (node 0 = “A”)
-//  1   │   2  ───► e2   0  ───► e0           │   (node 1 = “B”)
-//  2   │   3  ───► e3   1  ───► e1 ─► e2     │   (node 2 = “C”)
-//      └─────────────────────────────────────┘
+// adjlist representation of a graph, based off rustc's and petgraph's linkedgraph
+// see: https://smallcultfollowing.com/babysteps/blog/2015/04/06/modeling-graphs-in-rust-using-vector-indices/
+// see: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_data_structures/graph/linked_graph/struct.LinkedGraph.html
+struct Node<N> { data: N, head_edges: [EdgeIndex; 2] }
+struct Edge<E> { data: E, next_edges: [EdgeIndex; 2], src: NodeIndex, tgt: NodeIndex }
+pub struct AdjLinkedList<N, E> { nodes: Vec<Node<N>>, edges: Vec<Edge<E>> }
 
-//      ┌────────────────────── Edges Vec ──────────────────────┐
-// Idx  │    src → dst     next_out   next_in                   │
-// ─────┼───────────────────────────────────────────────────────┤
-//  e0  │   0  → 1         1          –                         │   (A → B)
-//  e1  │   0  → 2         –          2                         │   (A → C)
-//  e2  │   1  → 2         –          –                         │   (B → C)
-//  e3  │   2  → 0         –          –                         │   (C → A)
-//      └───────────────────────────────────────────────────────┘
-// Legend: “–” = `EdgeIndex::end()` / “no next”
 
-impl<N, E> AdjLL<N, E> {
+impl<N, E> AdjLinkedList<N, E> {
     // NB: create, update, and delete methods are defined in concrete impl
     //     whereas read methods are defined in trait impl for concrete type,
     //     given that algorithms are read-only queries (with respect to the graph).
@@ -115,12 +107,24 @@ impl<N, E> AdjLL<N, E> {
         todo!()
     }
 
-    fn gen_node_index(&self) -> NodeIndex { NodeIndex(self.nodes.len()) }
     pub fn add_node(&mut self, data: N) -> NodeIndex {
-        let i = self.gen_node_index();
-        self.nodes.push(Node { data });
+        let i = NodeIndex(self.nodes.len());
+        self.nodes.push(Node { data, head_edges: [INVALID_EDGE_INDEX, INVALID_EDGE_INDEX] });
         i
     }
+
+    pub fn add_edge(&mut self, data: E, src: NodeIndex, tgt: NodeIndex) -> EdgeIndex {
+        let src_outgoing_head = self.nodes[src.0].head_edges[OUTGOING];
+        let tgt_incoming_head = self.nodes[tgt.0].head_edges[INCOMING];
+        self.edges.push(Edge { data, next_edges: todo!(), src, tgt });
+        todo!()
+    }
+
+    pub fn update_node() -> () {}
+    pub fn update_edge() -> () {}
+
+    pub fn delete_node() -> () {}
+    pub fn delete_edge() -> () {}
 }
 
 pub struct AdjVec {}
