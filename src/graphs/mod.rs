@@ -1,72 +1,74 @@
-//! this module contains a single graph trait which logically defines graph algorithms
-//! generically, independant from their physical representation in memory.
-//! this design is 1. zero cost and 2. non-anemic since the plethora of graph algorithms
-//! implemented via provided methods can treat graphs homogenously through required methods.
-//! that is, variant-specific logic via virtual dispatch is not required.
-//! both required and provided methods hook into rust iterators.
+//! the graph module is designed so that from the users/callers/clients perspective,
+//! the logical algorithmic operations (located in submodules) are fixed, whereas
+//! the physical datastructure representations can be extended by implementing
+//! the graph trait for their custom representation. while this abstraction is
+//! zero-cost because of the use of static dispatch with traits and higher kinded types (GATs)
+//! (as oposed to dynamic dispatch with vtables/vfunctions), if users require the
+//! ability to extend operations without changing the library's source, this
+//! becomes more complex in rust because of the lack of RTTI necessary for
+//! dynamic cast operators. a visitor-like approach needs to be incorporated
 mod traversals;
 
 
-
 // TODO:
-// - associated types?
-// - generic associated types?
 // - unsafe for bfsmut iterator adapter??
 // - parallel bfs
 
 use std::{collections::{HashSet, VecDeque}, iter};
-use crate::graphs::traversals::{Bfs, BfsMut, IntoBfs};
+use crate::graphs::traversals::{Bfs, BfsMut, Dfs, DfsMut, IntoBfs, IntoDfs};
+
+/// the VisitMap trait is a separate trait from the Graph trait, and is used
+/// as an associated type for the latter. this is because the set of visited
+/// nodes is transient state used in graph algorithms, and increases the
+/// 1. library flexibility in borrow fideltiy (leasing &g *and* &mut vm) without the cost of interior mutability
+/// 2. user extensibility in pluggable storages (hashset, bitset, densebitset,...) without the cost of M*N problem
+trait VisitMap<NId> {
+    fn visit(&mut self, v: &NId) -> bool;
+    fn unvisit(&mut self, v: &NId) -> bool;
+    fn visited(&self, v: NId) -> bool;
+}
+
+/// the Graph trait is a unification of petgraph's three base traits using GATs:
+/// 1. node/edge identifiers types (pointer, reference, handle, or index)
+/// 2. adjacenct neighbors function
+/// 3. visitation types and functions
 pub trait Graph {
-    // from the perspective of the logical algorithm, physical data structures
-    // need to provide *some* way of identifying nodes and edges. the choice
-    // of whether this identifier is a pointer, a reference, a handle, or an index
-    // is up to the data structure, and does not concern the algorithm.
     type NodeId: Copy + PartialEq;
     type EdgeId: Copy + PartialEq;
-
-    fn nodes(&self) -> impl Iterator<Item=Self::NodeId>;
-    fn edges(&self) -> impl Iterator<Item=Self::EdgeId>;
     fn neighbors(&self, v: Self::NodeId) -> impl Iterator<Item=Self::NodeId>;
+    type Map: VisitMap<Self::NodeId>;
+    fn visit_map(&self) -> Self::Map;
+    fn reset_map(&self, map: &mut Self::Map);
 
 
-    fn into_bfs(self, v: Self::NodeId) -> IntoBfs<Self>
-    where Self: Sized {
-        IntoBfs { g: self, frontier: VecDeque::from([v]), visited: HashSet::from([v])  }
-    }
 
-    fn bfs(&self, v: Self::NodeId) -> Bfs<'_, Self>
-    where Self: Sized {
-        Bfs { g: self, frontier: Vec::from([v]), visited: HashSet::from([v])  }
-    }
-
-    fn bfs_mut(&mut self, v: Self::NodeId) -> BfsMut<'_, Self>
-    where Self: Sized {
-        BfsMut { g: self, frontier: Vec::from([v]), visited: HashSet::from([v]) }
-    }
+    fn into_bfs(self, from: Self::NodeId) -> IntoBfs<Self> where Self: Sized { IntoBfs { g: self, q: VecDeque::from([from]), visited: HashSet::from([from]) } }
+    fn bfs(&self, from: Self::NodeId) -> Bfs<'_, Self> where Self: Sized { Bfs { g: self, q: VecDeque::from([from]), visited: HashSet::from([from]) } }
+    fn bfs_mut(&mut self, from: Self::NodeId) -> BfsMut<'_, Self> where Self: Sized { BfsMut { g: self, q: VecDeque::from([from]), visited: HashSet::from([from]) } }
+    fn into_dfs(self, from: Self::NodeId) -> IntoDfs<Self> where Self: Sized { IntoDfs { g: self, s: Vec::from([from]), visited: HashSet::from([from]) } }
+    fn dfs(&self, from: Self::NodeId) -> Dfs<'_, Self> where Self: Sized { Dfs { g: self, s: Vec::from([from]), visited: HashSet::from([from]) } }
+    fn dfs_mut(&mut self, from: Self::NodeId) -> DfsMut<'_, Self> where Self: Sized { DfsMut { g: self, s: Vec::from([from]), visited: HashSet::from([from]) } }
 }
 
 
 
 
+impl<NId, T> VisitMap<NId> for HashSet<T> { // TODO: HashSet<NId>?
+    fn visit(&mut self, v: &NId) -> bool { todo!() }
+    fn unvisit(&mut self, v: &NId) -> bool { todo!() }
+    fn visited(&self, v: NId) -> bool { todo!() }
+}
 
-
-
-
-impl<N, E> Graph for AdjLL<N, E> {
+impl<N, E> Graph for AdjLinkedList<N, E> {
     type NodeId = NodeIndex;
     type EdgeId = EdgeIndex;
-
-    fn nodes(&self) -> impl Iterator<Item=Self::NodeId> {
-        iter::empty()
-    }
-
-    fn edges(&self) -> impl Iterator<Item=Self::EdgeId> {
-        iter::empty()
-    }
-
     fn neighbors(&self, v: Self::NodeId) -> impl Iterator<Item=Self::NodeId> {
         iter::empty()
     }
+    
+    type Map = HashSet<Self::NodeId>;
+    fn visit_map(&self) -> Self::Map { todo!() }
+    fn reset_map(&self, map: &mut Self::Map) { todo!() }
 }
 
 
