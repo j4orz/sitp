@@ -25,6 +25,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "elements"
+version = "0.1.0"
+
+[[package]]
 name = "encode_unicode"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -70,6 +74,7 @@ name = "picoc"
 version = "0.1.0"
 dependencies = [
  "bril-rs",
+ "elements",
  "insta",
  "thiserror",
 ]

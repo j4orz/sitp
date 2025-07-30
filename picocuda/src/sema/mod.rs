@@ -1,6 +1,5 @@
-pub mod parser;
+pub mod sema_parser;
 pub mod typer;
-pub mod selector;
 
 pub type Ast = Vec<Stmt>; pub enum Stmt { Ret(Expr) }
 pub enum Expr {

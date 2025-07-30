@@ -3,7 +3,7 @@ pub mod selector;
 pub mod encoder;
 pub mod exporter;
 
-pub enum CPU { R5, ARM, X86 } pub enum CallingConvention { SystemV }
+pub enum CPU { R5, ARM, X86 } pub enum CC { SystemV }
 pub enum MachPrg { R5(Vec<R5MachInstr>), ARM(Vec<ARMInstr>), X86(Vec<X86Instr>) }
 // NB: parallelizing the compiler requires moving the static mutable counter into TLS
 //     also skipping 0 since node ids show up in bit vectors, work lists, etc.

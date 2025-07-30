@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs::File, io, path::Path, process::{Command, Stdio}};
 use bril::{Code, EffectOps, Instruction};
+use ::elements::graphs::AdjLinkedList;
 use elements::graphs as elements;
 
 // NB1: bril's rust tooling uses git as their package registry (no crates.io).
@@ -24,7 +25,7 @@ use elements::graphs as elements;
 //      the u8 -> json mapping is computed with an online as-needed basis rather than
 //      an offline batch job to avoid out of sync issues with upstream .bril and
 //      downstream .json artifacts see: https://github.com/sampsyo/bril/tree/main/benchmarks
-pub fn parse(path: &Path) -> Result<impl elements::Graph, ParseError> {
+pub fn parse_bril2cfg(path: &Path) -> Result<AdjLinkedList<i32, i32, usize>, ParseError> {
     let src_bril = File::open(path)?;
     let u82json = Command::new("bril2json").stdout(Stdio::piped()).stdin(src_bril).spawn()?;
     let linear = bril::load_program_from_read(u82json.stdout.unwrap());
@@ -32,7 +33,7 @@ pub fn parse(path: &Path) -> Result<impl elements::Graph, ParseError> {
     Ok(cfg)
 }
 
-fn linear2cfg<'a>(linear: bril::Program) -> impl elements::Graph {
+fn linear2cfg<'a>(linear: bril::Program) -> AdjLinkedList<i32, i32, usize> {
     linear.functions.into_iter().map(|f| {
         let (mut bbs, bbnv, bb) =
 
@@ -56,7 +57,7 @@ fn linear2cfg<'a>(linear: bril::Program) -> impl elements::Graph {
         bbs
     });
 
-    let foo = elements::AdjLinkedList::new();
+    let foo: AdjLinkedList<i32, i32, usize> = elements::AdjLinkedList::new();
     foo
 }
 
