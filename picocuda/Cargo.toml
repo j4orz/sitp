@@ -9,6 +9,7 @@ edition = "2024"
 thiserror = "2.0.12"
 bril = { git = "https://github.com/sampsyo/bril", package = "bril-rs" }
 elements = { path = "../e"}
+itertools = "0.14.0"
 
 [dev-dependencies]
 insta = "1.43.1"
