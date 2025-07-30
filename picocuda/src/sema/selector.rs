@@ -1,4 +1,7 @@
-use crate::ast::{MachPrg, Ast, R5MachInstr, R5OpCode, CallingConvention, Expr, Stmt, CPU};
+
+use crate::sema::{Ast, Expr, Stmt};
+use crate::cgen::{MachPrg, R5MachInstr, R5OpCode, CallingConvention, CPU};
+
 
 pub fn select(prg: Ast, cpu: CPU, _cc: CallingConvention) -> MachPrg { match cpu {
     CPU::R5 => MachPrg::R5(select_r5stmt(prg)),

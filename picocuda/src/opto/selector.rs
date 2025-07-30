@@ -1,5 +1,5 @@
 use bril::Program;
-use crate::cfg::{MachPrg, R5MachInstr, R5OpCode, CallingConvention, CPU};
+use crate::cgen::{MachPrg, R5MachInstr, R5OpCode, CallingConvention, CPU};
 
 pub fn select(prg: Program, cpu: CPU, _cc: CallingConvention) -> MachPrg { match cpu {
     CPU::R5 => MachPrg::R5(select_r5stmt(prg)),

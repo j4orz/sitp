@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs::File, io, path::Path, process::{Command, Stdio}};
-use bril::{load_program_from_read, Code, EffectOps, Instruction};
+use bril::{Code, EffectOps, Instruction};
+use elements::graphs as elements;
 
 // NB1: bril's rust tooling uses git as their package registry (no crates.io).
 //      there are 2 rust implementations of bril2json (u8->json) upstream
@@ -20,20 +21,19 @@ use bril::{load_program_from_read, Code, EffectOps, Instruction};
 
 // NB2: parser parses concrete .bril to in memory .json (u8 -> json) with
 //      system installed `bril2json` (see: https://github.com/sampsyo/bril/tree/main/bril2json-rs).
-//      the u8 -> json mapping is computed on an online as-needed basis rather than
+//      the u8 -> json mapping is computed with an online as-needed basis rather than
 //      an offline batch job to avoid out of sync issues with upstream .bril and
 //      downstream .json artifacts see: https://github.com/sampsyo/bril/tree/main/benchmarks
-pub fn parse(path: &Path) -> Result<bril::Program, ParseError> {
+pub fn parse(path: &Path) -> Result<impl elements::Graph, ParseError> {
     let src_bril = File::open(path)?;
     let u82json = Command::new("bril2json").stdout(Stdio::piped()).stdin(src_bril).spawn()?;
-    let linear = load_program_from_read(u82json.stdout.unwrap());
+    let linear = bril::load_program_from_read(u82json.stdout.unwrap());
     let cfg = linear2cfg(linear);
-    todo!()
-    // Ok(cfg)
+    Ok(cfg)
 }
 
-fn linear2cfg<'a>(threeac: bril::Program) -> impl Iterator<Item = Vec<Vec<Instruction>>> {
-    threeac.functions.into_iter().map(|f| {
+fn linear2cfg<'a>(linear: bril::Program) -> impl elements::Graph {
+    linear.functions.into_iter().map(|f| {
         let (mut bbs, bbnv, bb) =
 
         f.instrs.into_iter().fold((Vec::new(), HashMap::new(), Vec::new()),
@@ -54,7 +54,10 @@ fn linear2cfg<'a>(threeac: bril::Program) -> impl Iterator<Item = Vec<Vec<Instru
 
         if !bb.is_empty() { bbs.push(bb) }
         bbs
-    })
+    });
+
+    let foo = elements::AdjLinkedList::new();
+    foo
 }
 
 use thiserror::Error;
