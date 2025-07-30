@@ -11,7 +11,7 @@ pub mod utils;
 
 use std::{cell::RefCell, collections::VecDeque, fmt::{Debug, Display}, ops::Deref, rc::{Rc, Weak}};
 use thiserror::Error;
-use crate::son::optimizer::Type;
+use crate::opto::son::optimizer::Type;
 
 // NB: parallelizing the compiler requires moving the static mutable counter into TLS
 //     also skipping 0 since node ids show up in bit vectors, work lists, etc.

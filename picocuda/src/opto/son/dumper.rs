@@ -1,5 +1,5 @@
 use std::{collections::{HashMap}, fmt::{self, Write}};
-use crate::son::{parser::{ParseResult, Scope}, DefEdge, OpCode};
+use crate::opto::son::{parser::{ParseResult, Scope}, DefEdge, OpCode};
 
 pub fn dump_dot(char_input: &[char], graph_output: &ParseResult) -> Result<String, fmt::Error> {
     let mut dump = String::new();

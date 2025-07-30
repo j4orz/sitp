@@ -1,5 +1,5 @@
 use std::{fmt::Display, mem};
-use crate::son::{DefEdge, OpCode};
+use crate::opto::son::{DefEdge, OpCode};
 
 // types form a symmetric complete bounded (ranked) lattice
 // see: https://en.wikipedia.org/wiki/Lattice_(order)
@@ -81,7 +81,7 @@ impl DefEdge {
 
 #[cfg(test)]
 mod test_optimizer {
-    use crate::son::{dumper, parser, utils::read_chars};
+    use crate::opto::son::{dumper, parser, utils::read_chars};
     use std::{assert_matches::assert_matches, path::Path};
     
     const TEST_DIR: &str = "tests/arith";

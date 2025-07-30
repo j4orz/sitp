@@ -1,5 +1,5 @@
 use std::{collections::HashMap, iter};
-use crate::son::{optimizer::Type, DefEdge, OpCode};
+use crate::opto::son::{optimizer::Type, DefEdge, OpCode};
 use thiserror::Error;
 
 #[derive(Error, Debug)] pub enum ParseError {
@@ -311,7 +311,7 @@ fn skip_ws(input: &[char]) -> &[char] { match input { [] => input, [f, r @ ..] =
 
 #[cfg(test)]
 mod test_parser {
-    use crate::son::{dumper, parser, utils::read_chars, OpCode};
+    use crate::opto::son::{dumper, parser, utils::read_chars, OpCode};
     use std::{assert_matches::assert_matches, fs, path::Path};
     
     const TEST_DIR: &str = "tests/arith";
@@ -425,7 +425,7 @@ enum ScopeOp { Read, Update(DefEdge) }
 mod test_lexer {
     use std::path::Path;
 
-    use crate::son::{parser, utils::read_chars};
+    use crate::opto::son::{parser, utils::read_chars};
 
     // arithmetic
     #[test] fn lit() {
