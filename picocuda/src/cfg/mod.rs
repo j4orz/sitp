@@ -1,65 +1,42 @@
+//!
+//!                  __________________________________________________________________
+//!                  |      sem                     opt                  gen          |
+//!                  |   ____________             ________         ________________   |
+//!                  |   |      ast |             | cfg--|-->cfg-->|\ isel/isched |   |             ____
+//!     o            |   |type  / \ |             | /    |         | \ ra         |   |            ||""||
+//!  _ /<. -->c0 u8--|-->|parse/   \|-->bril u8-->|/     |         |  \ enc--exp--|---|-->r5 elf-->||__||
+//! (*)>(*)          |   -----------              --------         ----------------   |            [ -=.]`)
+//!                  |   OLD front(1)            NEW mid(2)      UPDATED back(3)      |            ====== 0
+//!                  -----------------------------------------------------------------|
+//!
+//!                                            PICOC
 use std::path::PathBuf;
 use std::{fs::File, io};
 use thiserror::Error;
-use crate::cfg::exporter::Format;
 
-//          data(types) | algo(impls)
-//          ------------|-----------
-// OLD    =    same     |   same
-// MOD    =    same     |   mod
-// NEW    =    same     |   new
+use crate::ast::{self, typer, CPU, MachPrg, R5OpCode, R5MachInstr, CallingConvention};
+use crate::cfg;
+pub mod parser;
+pub mod selector;
+pub mod allocator;
+pub mod encoder;
+pub mod exporter;
 
-// /////////////////////////////////////////////////////////////////////////////
-// 1. HIGH LEVEL BLOCK DIAGRAM
-//                  __________________________________________________________________
-//                  |      sem                     opt                  gen          |
-//                  |   ____________             ________         ________________   |
-//                  |   |      ast |             | cfg--|-->cfg-->|\ isel/isched |   |             ____
-//     o            |   |type  / \ |             | /    |         | \ ra         |   |            ||""||
-//  _ /<. -->c0 u8--|-->|parse/   \|-->bril u8-->|/     |         |  \ enc--exp--|---|-->r5 elf-->||__||
-// (*)>(*)          |   -----------              --------         ----------------   |            [ -=.]`)
-//                  |   OLD front(1)            NEW mid(2)      UPDATED back(3)      |            ====== 0
-//                  -----------------------------------------------------------------|
-//
-//                                            PICOC
-// /////////////////////////////////////////////////////////////////////////////
+struct BB { entry: Instr, instrs: Vec<Instr>, exit: Instr } struct Instr {}
 
-
-// /////////////////////////////////////////////////////////////////////////////
-// 2. ALGORITHMS + DATA STRUCTURES
-// ALGORITHMS
-use crate::ast::{self, typer}; // OLD front(1)
-pub mod parser; use crate::cfg::{self};                           // NEW mid(2)
-pub mod selector; pub mod allocator; pub mod encoder; pub mod exporter; // MOD back(3)
-// DATA STRUCTURES
-use crate::ast::Ast; //  OLD SOURCE (C0)
-
-struct BB { entry: Instr, instrs: Vec<Instr>, exit: Instr, } // NEW IR: CFG(BB)+SSA
-struct Instr {}
-
-use crate::ast::{CPU, MachPrg, R5OpCode, R5MachInstr, CallingConvention}; // OLD TARGET: {R5,ARM,x86}
-// /////////////////////////////////////////////////////////////////////////////
-
-
-// /////////////////////////////////////////////////////////////////////////////
-// 3. ALGORITHMS + DATA STRUCTURES = PROGRAMS B)
 pub fn compile() -> Result<(), CompileError> {
     let (concrete_c0, elf_r5) = (File::open("hello.c")?, File::create("foo.txt")?);
 
-    // (1)
+    // (1) lift
     let ast = ast::parser::parse(concrete_c0);
     let _ = typer::typ()?;
     
-    // (2) 
+    // (2) optimize
     let linear_bril = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/bril/benchmarks/core/fact.bril");
     let cfg = cfg::parser::parse(&linear_bril)?;
-    // -local opts
-    // -regional opts
-    // -intraproc opts
-    // -interproc opts
-
+    // local, regional, global, program opts...
     
-    // (3)
+    // (3) lower
     // let aasmtree = selector::select(threeac, CPU::R5, CallingConvention::SystemV);
     // let asmtree = allocator::allocate(aasmtree);
     // let machcode = encoder::encode(asmtree);
@@ -74,4 +51,3 @@ pub fn compile() -> Result<(), CompileError> {
     #[error("type error")] TypeError(#[from] ast::typer::TypeError),
     #[error("parse error")] ParseError(#[from] cfg::parser::ParseError)
 }
-// /////////////////////////////////////////////////////////////////////////////
