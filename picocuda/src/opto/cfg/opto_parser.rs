@@ -1,6 +1,6 @@
-use std::{fs::File, io, path::Path, process::{Command, Stdio}};
-use itertools::{Itertools, put_back};
-use elements::graphs as elements;
+use std::{collections::HashMap, fs::File, io, path::Path, process::{Command, Stdio}};
+use itertools::Itertools;
+use elements::graphs::{self as e, index::NodeIndex, AdjLinkedList, Graph};
 use bril::{Code, EffectOps, Instruction};
 
 use crate::opto::cfg::BB;
@@ -10,18 +10,58 @@ use crate::opto::cfg::BB;
 //      the u8 -> json mapping is computed with an online as-needed basis rather than
 //      an offline batch job to avoid out of sync issues with upstream .bril and
 //      downstream .json artifacts see: https://github.com/sampsyo/bril/tree/main/benchmarks
-pub fn parse_bril2cfg(path: &Path) -> Result<elements::AdjLinkedList<i32, i32, usize>, ParseError> {
+pub fn parse_bril2cfg(path: &Path) -> Result<Vec<e::AdjLinkedList<BB, (), usize>>, ParseError> {
     let src_bril = File::open(path)?;
     let u82json = Command::new("bril2json").stdout(Stdio::piped()).stdin(src_bril).spawn()?;
     let linear_prg = bril::load_program_from_read(u82json.stdout.unwrap());
 
-    let foo =
+    // combinator pipeline processes per function (for now).
+    let cfgs =
     linear_prg.functions
     .into_iter()
     .map(|f| linf_to_bbs(f.instrs.into_iter()))
-    .map(|f_bbs| {
+    .map(|fbbs| {
+        let mut i = 0;
+        fbbs.fold(HashMap::new(), |mut lookup, bb| {
+            let id = match &bb.0.first().unwrap() { // todo
+            Code::Label { label } => label.clone(),
+            Code::Instruction(instruction) => {
+                i += 1;
+                format!("shubaluba{i}").to_owned()
+            }};
+            lookup.insert(id, bb);
+            lookup
+        })
+    })
+    // .inspect(|foo| { println!("moose: {:?}", foo)})
+    // .collect::<Vec<_>>();
+    .map(|flbl2bb| {
+        let (g, lbl2nid) =
+            flbl2bb
+            .into_iter()
+            .fold((e::AdjLinkedList::new(), HashMap::new()),|(mut g, mut lbl2nid):(AdjLinkedList<BB, (), usize>, HashMap<String, NodeIndex<usize>>), (lbl, bb)| {
+                let nid = g.add_node(bb);
+                lbl2nid.insert(lbl, nid);
+                (g, lbl2nid)
+            });
 
+        let bar =
+        g.node_references()
+        .map(|(id, bb)| {
+            let last = bb.0.last().unwrap();
+            match last {
+            Code::Label { label } => {
+                let succ_nid = lbl2nid.get(label).unwrap(); // todo
+                g.add_edge((), id, *succ_nid)
+            },
+            Code::Instruction(instruction) => todo!() }
+        });
+
+        // fcfg
+        todo!()
     });
+    
+    Ok(cfgs.collect::<Vec<_>>())
 }
 
 // linear2blocks chunks a linear stream of instrs into a linear stream of bbs.
@@ -48,7 +88,7 @@ fn linf_to_bbs(function: impl Iterator<Item=bril::Code>) -> impl Iterator<Item=B
     bbs.into_iter()
 }
 
-fn bbs2cfg(f_bbs: impl Iterator<Item=BB>) -> elements::AdjLinkedList<i32, i32, usize> {
+fn bbs2cfg(f_bbs: impl Iterator<Item=BB>) -> e::AdjLinkedList<i32, i32, usize> {
     todo!()
 }
 
