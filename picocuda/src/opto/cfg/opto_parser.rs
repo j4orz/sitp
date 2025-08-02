@@ -33,31 +33,31 @@ pub fn parse_bril2cfg(path: &Path) -> Result<Vec<e::AdjLinkedList<BB, (), usize>
             lookup
         })
     })
-    // .inspect(|foo| { println!("moose: {:?}", foo)})
-    // .collect::<Vec<_>>();
+    .inspect(|foo| { println!("moose: {:?}", foo)})
+    .collect::<Vec<_>>()
+    .into_iter()
     .map(|flbl2bb| {
         let (g, lbl2nid) =
-            flbl2bb
-            .into_iter()
-            .fold((e::AdjLinkedList::new(), HashMap::new()),|(mut g, mut lbl2nid):(AdjLinkedList<BB, (), usize>, HashMap<String, NodeIndex<usize>>), (lbl, bb)| {
-                let nid = g.add_node(bb);
-                lbl2nid.insert(lbl, nid);
-                (g, lbl2nid)
-            });
-
-        let bar =
-        g.node_references()
-        .map(|(id, bb)| {
-            let last = bb.0.last().unwrap();
-            match last {
-            Code::Label { label } => {
-                let succ_nid = lbl2nid.get(label).unwrap(); // todo
-                g.add_edge((), id, *succ_nid)
-            },
-            Code::Instruction(instruction) => todo!() }
+        flbl2bb
+        .into_iter()
+        .fold((e::AdjLinkedList::new(), HashMap::new()),|(mut g, mut lbl2nid):(AdjLinkedList<BB, (), usize>, HashMap<String, NodeIndex<usize>>), (lbl, bb)| {
+            let nid = g.add_node(bb);
+            lbl2nid.insert(lbl, nid);
+            (g, lbl2nid)
         });
 
-        // fcfg
+        // let bar =
+        // g.node_references()
+        // .map(|(id, bb)| {
+        //     let last = bb.0.last().unwrap();
+        //     match last {
+        //     Code::Label { label } => {
+        //         let succ_nid = lbl2nid.get(label).unwrap(); // todo
+        //         g.add_edge((), id, *succ_nid)
+        //     },
+        //     Code::Instruction(instruction) => todo!() }
+        // });
+
         todo!()
     });
     

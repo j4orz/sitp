@@ -14,5 +14,4 @@
 #![feature(assert_matches)]
 pub mod sema;
 pub mod opto;
-pub mod son;
 pub mod cgen;
