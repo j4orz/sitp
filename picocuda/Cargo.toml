@@ -1,5 +1,3 @@
-cargo-features = ["edition2024"]
-
 [package]
 name = "picoc"
 version = "0.1.0"

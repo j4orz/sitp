@@ -1,40 +1,44 @@
 use std::path::PathBuf;
 use std::{fs::File, io, path::Path};
 use elements::graphs::AdjLinkedList;
+use picoc::opto::Cfg;
 use picoc::sema::{sema_parser, typer, Ast};
 use picoc::opto::{self, cfg::opto_parser};
 use picoc::cgen::{allocator, encoder, exporter::{self, Format}, selector, CC, CPU};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let foo = println!("picocuda");
-    let bar = compile_cfg()?;
+    let bar = compile()?;
     Ok(())
 }
 
-enum OptoConfig { Ast, Cfg, CfgSsa, Son }
+struct OptoConfig { ir: OptoIR, level: OptoLevel } enum OptoIR { Ast, Cfg, CfgSsa, Son } enum OptoLevel { O0, O1 }
+impl OptoConfig { fn new(ir: OptoIR, level: OptoLevel) -> Self { Self { ir, level } } }
+
 enum OptodPrg { Ast(Ast), Cfg(Cfg), CfgSsa(Cfg), Son }
 
-pub fn compile_cfg() -> Result<(), CompileError> {
+pub fn compile() -> Result<(), CompileError> {
     // let (src_c0, dst_r5) = (File::open("hello.c")?, File::create("foo.txt")?);
-    let ast = sema_parser::parse_c02ast(src_c0);
+    // let ast = sema_parser::parse_c02ast(src_c0);
     let _ = typer::typ()?;
 
-    let opto_config = OptoConfig::Ast;
-    let optod_prg = match opto_config {
-        Opto::None => OptodPrg::Ast(ast),
-        Opto::Cfg => {
+    let opto_config = OptoConfig::new(OptoIR::Cfg, OptoLevel::O0);
+    let optod_prg = match opto_config.ir {
+        OptoIR::Ast => todo!(),
+        OptoIR::Cfg => {
             let src_bril = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/bril/test/interp/core/jmp.bril");
             let f_cfgs = opto_parser::parse_bril2cfg(&src_bril)?;
-            // local opts
-            // globla opts
+            match opto_config.level {
+            OptoLevel::O0 => OptodPrg::Cfg(f_cfgs),
+            OptoLevel::O1 => {
+                // lvn
+                // dataflow
+                // dominators
+                todo!()
+            }}
         },
-        Opto::CfgSsa => {
-            let src_bril = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/bril/test/interp/core/jmp.bril");
-            let f_cfgs = opto_parser::parse_bril2cfg(&src_bril)?;
-            // local opts
-            // global opts
-        },
-        Opto::Son => todo!(),
+        OptoIR::CfgSsa => todo!(),
+        OptoIR::Son => todo!(),
     };
 
     let lowered_prg = match optod_prg {
@@ -45,14 +49,18 @@ pub fn compile_cfg() -> Result<(), CompileError> {
             // let elf = exporter::export(machcode, Format::Executable, dst_r5);
             // TODO: write elf to disk
         },
-        OptodPrg::Cfg(_) => todo!(),
+        OptodPrg::Cfg(f_cfgs) => {
+            todo!()
+            // select
+            // allocate
+            // encode
+            // export
+        },
         OptodPrg::CfgSsa(_) => todo!(),
         OptodPrg::Son => todo!(),
     };
     Ok(())
 }
-
-fn compile_son() -> () {}
 
 #[derive(thiserror::Error, Debug)] pub enum CompileError {
     #[error("i/o error")] IOError(#[from] io::Error),

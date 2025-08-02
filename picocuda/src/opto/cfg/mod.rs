@@ -14,7 +14,7 @@ pub mod opto_parser;
 //     g:
 // }
 
-pub fn local_passes(input_prg: Cfg) -> Cfg {
+// pub fn local_passes(input_prg: Cfg) -> Cfg {
     // let output_prg = input_prg
     // .into_iter()
     // .map(|f| {
@@ -23,7 +23,7 @@ pub fn local_passes(input_prg: Cfg) -> Cfg {
     // .collect::<Vec<_>>();
     
     // output_prg
-}
+// }
 
 fn lvn(input: BB) -> BB {
     todo!()
