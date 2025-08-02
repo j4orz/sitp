@@ -1,3 +1,60 @@
+==================================================================================================================
+           ,,                                     ,,                      ,,                   
+ .M"""bgd  db                                   `7MM                      db   mm              
+,MI    "Y                                         MM                           MM              
+`MMb.    `7MM  `7MMpMMMb.  .P"Ybmmm `7MM  `7MM    MM   ,6"Yb.  `7Mb,od8 `7MM mmMMmm `7M'   `MF'
+  `YMMNq.  MM    MM    MM :MI  I8     MM    MM    MM  8)   MM    MM' "'   MM   MM     VA   ,V  
+.     `MM  MM    MM    MM  WmmmP"     MM    MM    MM   ,pm9MM    MM       MM   MM      VA ,V   
+Mb     dM  MM    MM    MM 8M          MM    MM    MM  8M   MM    MM       MM   MM       VVV    
+P"Ybmmd" .JMML..JMML  JMML.YMMMMMb    `Mbod"YML..JMML.`Moo9^Yo..JMML.   .JMML. `Mbmo    ,V     
+                          6'     dP                                                    ,V      
+                          Ybmmmd'                                                   OOb"
+                                                                  
+ .M"""bgd                   mm                                    
+,MI    "Y                   MM                                    
+`MMb.  `7M'   `MF',pP"Ybd mmMMmm .gP"Ya `7MMpMMMb.pMMMb.  ,pP"Ybd 
+  `YMMNq.VA   ,V  8I   `"   MM  ,M'   Yb  MM    MM    MM  8I   `" 
+.     `MM VA ,V   `YMMMa.   MM  8M""""""  MM    MM    MM  `YMMMa. 
+Mb     dM  VVV    L.   I8   MM  YM.    ,  MM    MM    MM  L.   I8 
+P"Ybmmd"   ,V     M9mmmP'   `Mbmo`Mbmmd'.JMML  JMML  JMML.M9mmmP' 
+          ,V                                                      
+       OOb"
+==================================================================================================================
+
+=========================
+Scalar Compilation (CPUs)
+=========================
+Ch1: AST
+- lec:
+- txt:
+
+Ch2: CFG
+- lec:
+- txt:
+
+Ch3: CFG-SSA
+- lec:
+- txt:
+
+Ch4: SoN
+- lec
+- txt
+
+=========================
+Vector Compilation (GPUs)
+=========================
+Ch5: Vectorization
+- lec
+- txt
+
+Ch 6: SIMT
+- lec
+- txt
+
+
+
+
+
 picoc vendors bril artifacts and binaries with git submodules in `vendor/bril`
 (see [the git book section 7.11](https://git-scm.com/book/en/v2/Git-Tools-Submodules)):
 
