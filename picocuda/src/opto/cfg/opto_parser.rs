@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fs::File, io, path::Path, process::{Command, Stdio}};
 use itertools::Itertools;
 use elements::graphs::{self as e, index::NodeIndex, AdjLinkedList, Graph};
-use bril::{Code, EffectOps, Instruction};
 
 use crate::opto::cfg::BB;
 
@@ -24,8 +23,8 @@ pub fn parse_bril2cfg(path: &Path) -> Result<Vec<e::AdjLinkedList<BB, (), usize>
         let mut i = 0;
         fbbs.fold(HashMap::new(), |mut lookup, bb| {
             let id = match &bb.0.first().unwrap() { // todo
-            Code::Label { label } => label.clone(),
-            Code::Instruction(instruction) => {
+            bril::Code::Label { label } => label.clone(),
+            bril::Code::Instruction(instruction) => {
                 i += 1;
                 format!("shubaluba{i}").to_owned()
             }};
@@ -76,9 +75,11 @@ fn linf_to_bbs(function: impl Iterator<Item=bril::Code>) -> impl Iterator<Item=B
 
     let bbs = function
     .chunk_by(move |code| {
-        let bb_is_starting = matches!(code, Code::Label { .. }); // 1. label
+        let bb_is_starting = matches!(code, bril::Code::Label { .. }); // 1. label
         if bb_ended || bb_is_starting { id += 1; bb_ended = false; }; // 2. bump key
-        bb_ended = if matches!(code, Code::Instruction(Instruction::Effect { op: EffectOps::Jump | EffectOps::Branch | EffectOps::Return, .. })) { true } else { false }; // 3. terminator
+        bb_ended = if matches!(code, bril::Code::Instruction(bril::Instruction::Effect {
+            op: bril::EffectOps::Jump | bril::EffectOps::Branch | bril::EffectOps::Return, .. }
+        )) { true } else { false }; // 3. terminator
         id
     })
     .into_iter() // ChunkBy implements IntoIterator (it is *not* an iterator itself)

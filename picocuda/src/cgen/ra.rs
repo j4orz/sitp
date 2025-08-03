@@ -1,5 +1,5 @@
-use crate::cgen::MachPrg;
+use crate::cgen::MachinePrg;
 
-pub fn alloc(aabsasm: MachPrg) -> MachPrg {
+pub fn alloc(aabsasm: MachinePrg) -> MachinePrg {
     todo!()
 }
