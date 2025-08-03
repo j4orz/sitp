@@ -1,17 +1,18 @@
-pub mod allocator;
-pub mod selector;
-pub mod encoder;
-pub mod exporter;
+pub mod isel;
+pub mod ra;
+pub mod enc;
+pub mod exp;
 
-pub enum CPU { R5, ARM, X86 } pub enum CC { SystemV }
-pub enum MachPrg { R5(Vec<R5MachInstr>), ARM(Vec<ARMInstr>), X86(Vec<X86Instr>) }
 // NB: parallelizing the compiler requires moving the static mutable counter into TLS
 //     also skipping 0 since node ids show up in bit vectors, work lists, etc.
 static mut VREG_COUNTER: u32 = 0;
 pub fn generate_vreg() -> u32 { unsafe { VREG_COUNTER += 1; VREG_COUNTER } }
 
-pub enum R5OpCode { // TARGET R5
-    Int, Int8, Add, AddI, Sub, Lui, Auipc, // arithmetic 
+pub enum HostMachine { R5, ARM, X86 } pub enum CC { SystemV }
+pub enum MachPrg { R5(Vec<R5MachInstr>), ARM(Vec<ARMInstr>), X86(Vec<X86Instr>) }
+
+pub enum R5OpCode {
+    Int, Int8, Add, AddI, Sub, Lui, Auipc,
     Ret
 }
 pub struct R5MachInstr {
