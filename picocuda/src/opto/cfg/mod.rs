@@ -1,6 +1,6 @@
 use elements::graphs::{self as e, index::NodeIndex, AdjLinkedList, Graph};
 
-use crate::opto::{Cfg, BB};
+use crate::opto::{Prg, BB};
 
 pub mod opto_parser;
 

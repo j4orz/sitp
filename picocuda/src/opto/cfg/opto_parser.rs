@@ -2,14 +2,14 @@ use std::{collections::HashMap, fs::File, io, path::Path, process::{Command, Std
 use itertools::Itertools;
 use elements::graphs::{self as e, index::NodeIndex, AdjLinkedList, Graph};
 
-use crate::opto::cfg::BB;
+use crate::opto::{cfg::BB, Prg};
 
 // NB2: parser parses concrete .bril to in memory .json (u8 -> json) with
 //      system installed `bril2json` (see: https://github.com/sampsyo/bril/tree/main/bril2json-rs).
 //      the u8 -> json mapping is computed with an online as-needed basis rather than
 //      an offline batch job to avoid out of sync issues with upstream .bril and
 //      downstream .json artifacts see: https://github.com/sampsyo/bril/tree/main/benchmarks
-pub fn parse_bril2cfg(path: &Path) -> Result<Vec<e::AdjLinkedList<BB, (), usize>>, ParseError> {
+pub fn parse_bril2cfg(path: &Path) -> Result<Prg<bril::Instruction>, ParseError> {
     let src_bril = File::open(path)?;
     let u82json = Command::new("bril2json").stdout(Stdio::piped()).stdin(src_bril).spawn()?;
     let linear_prg = bril::load_program_from_read(u82json.stdout.unwrap());

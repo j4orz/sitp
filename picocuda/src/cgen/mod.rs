@@ -1,4 +1,5 @@
-use crate::opto::Cfg;
+use crate::sema::Ast;
+use crate::opto::Prg;
 
 pub mod isel;
 pub mod ra;
@@ -6,7 +7,7 @@ pub mod enc;
 pub mod exp;
 
 pub enum HostMachine { R5, ARM, X86 } pub enum CC { SystemV }
-pub enum MachinePrg { Ast(Ast), Cfg(Cfg<riscv::R5MachInstr>), CfgSsa(Cfg<riscv::R5MachInstr>), Son }
+pub enum MachinePrg { Ast(Ast), Cfg(Prg<riscv::Instr>), CfgSsa(Prg<riscv::Instr>), Son }
 
 mod riscv {
         // NB: parallelizing the compiler requires moving the static mutable counter into TLS
@@ -19,14 +20,14 @@ mod riscv {
         Ret
     }    
 
-    pub struct R5MachInstr {
+    pub struct Instr {
         // NB: machine instruction maintains retains semantic facts discovered/generated
         //     so 1. use->def facts (operands) and 2. registers (vreg/phyreg)
-        opcode: R5OpCode, operands: Box<[R5MachInstr]>, // Box<[]> keeps children operands fixed arity
+        opcode: R5OpCode, operands: Box<[Instr]>, // Box<[]> keeps children operands fixed arity
         vreg: u32, phyreg: Option<u32>,
     }
-    impl R5MachInstr {
-        pub fn new(opcode: R5OpCode, operands: Box<[R5MachInstr]>) -> Self {
+    impl Instr {
+        pub fn new(opcode: R5OpCode, operands: Box<[Instr]>) -> Self {
             Self { opcode, operands, vreg: generate_vreg(), phyreg: None, }
         }
     }
