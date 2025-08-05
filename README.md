@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-picograd: for something between micrograd and tinygrad
-=======
-==================================================================================================================
+```
            ,,                                     ,,                      ,,                   
  .M"""bgd  db                                   `7MM                      db   mm              
 ,MI    "Y                                         MM                           MM              
@@ -22,37 +19,23 @@ Mb     dM  VVV    L.   I8   MM  YM.    ,  MM    MM    MM  L.   I8
 P"Ybmmd"   ,V     M9mmmP'   `Mbmo`Mbmmd'.JMML  JMML  JMML.M9mmmP' 
           ,V                                                      
        OOb"
-==================================================================================================================
+```
 
-=========================
-Scalar Compilation (CPUs)
-=========================
-Ch1: AST
-- lec:
-- txt:
+Serial Compilation: C on CPUs [lec]() [txt]() [src]()
+---
+1. AST + Stack Spills: [lec]() [txt](https://j4orz.ai/zero-to-hero/ch1.html) [src]()
+2. CFG + Chaitin-Briggs: [lec]() [txt](https://j4orz.ai/zero-to-hero/ch2.html) [src]()
+3. CFG-SSA + Hack/Pereira: [lec]() [txt](https://j4orz.ai/zero-to-hero/ch3.html) [src]()
+4. SoN + Chaitin-Briggs-Click: [lec]() [txt](https://j4orz.ai/zero-to-hero/ch4.html) [src]()
+5. Parsing llm.c [lec]() [txt]() [src]()
 
-Ch2: CFG
-- lec:
-- txt:
+Parallel Compilation: CUDA C on GPUs
+---
+6. Vectorization: [lec]() [txt]() [src]()
+7. SIMT: [lec]() [txt]() [src]()
 
-Ch3: CFG-SSA
-- lec:
-- txt:
-
-Ch4: SoN
-- lec
-- txt
-
-=========================
-Vector Compilation (GPUs)
-=========================
-Ch5: Vectorization
-- lec
-- txt
-
-Ch 6: SIMT
-- lec
-- txt
+Differentiable Compilation: PyTorch
+---
 
 
 
@@ -72,4 +55,3 @@ if you need to materalize additional source from upstream, run
 ```sh
 git -C vendor/bril sparse-checkout add /path/to/new/source
 ```
->>>>>>> import-picocuda

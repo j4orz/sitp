@@ -1,22 +1,4 @@
 [package]
-<<<<<<< HEAD
-name = "picograd"
-version = "0.1.0"
-edition = "2024"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-name = "picograd"
-path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-numpy = "0.23.0"
-opencl3 = "0.12.0"
-pyo3 = { version = "0.23.3", features = ["multiple-pymethods"] }
-rand = "0.9.0"
-thiserror = "2.0.11"
-=======
 name = "picoc"
 version = "0.1.0"
 edition = "2024"
@@ -45,4 +27,3 @@ insta = "1.43.1"
 #      unfortunately, as of Cargo 1.88 (2025-06-26),
 #      "git and path cannot be used at the same time"
 #      see: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories
->>>>>>> import-picocuda
