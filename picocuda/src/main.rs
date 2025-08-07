@@ -14,14 +14,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 pub fn compile() -> Result<(), CompileError> {
     // let (src_c0, dst_r5) = (File::open("hello.c")?, File::create("foo.txt")?);
     // let ast = sema_parser::parse_c02ast(src_c0);
-    let _ = typer::typ()?;
+    // let _ = typer::typ()?;
 
     let opto_config = OptoConfig::new(OptoIR::Cfg, OptoLevel::O0);
     let optod_prg =
     match opto_config.ir {
     OptoIR::Ast => { todo!() },
     OptoIR::Cfg => {
-        let src_bril = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("vendor/bril/test/interp/core/jmp.bril");
+        let src_bril = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vendor/bril/test/interp/core/jmp.bril");
         let f_cfgs = opto_parser::parse_bril2cfg(&src_bril)?;
         match opto_config.level {
         OptoLevel::O0 => OptodPrg::Cfg(f_cfgs),

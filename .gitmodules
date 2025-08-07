@@ -1,0 +1,3 @@
+[submodule "vendor/bril"]
+	path = vendor/bril
+	url = https://github.com/sampsyo/bril.git
