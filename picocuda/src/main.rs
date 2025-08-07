@@ -17,12 +17,14 @@ pub fn compile() -> Result<(), CompileError> {
     // let _ = typer::typ()?;
 
     let opto_config = OptoConfig::new(OptoIR::Cfg, OptoLevel::O0);
+    println!("picocuda optimizing...");
     let optod_prg =
     match opto_config.ir {
     OptoIR::Ast => { todo!() },
     OptoIR::Cfg => {
         let src_bril = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vendor/bril/test/interp/core/jmp.bril");
         let f_cfgs = opto_parser::parse_bril2cfg(&src_bril)?;
+
         match opto_config.level {
         OptoLevel::O0 => OptodPrg::Cfg(f_cfgs),
         OptoLevel::O1 => {
@@ -35,7 +37,8 @@ pub fn compile() -> Result<(), CompileError> {
     OptoIR::CfgSsa => todo!(),
     OptoIR::Son => todo!(),
     };
-
+    
+    println!("picocuda code generating...");
     let lowered_prg = match &optod_prg {
         OptodPrg::Ast(stmts) => {
             let aasmtree = isel::sel(optod_prg, HostMachine::R5, CC::SystemV);
