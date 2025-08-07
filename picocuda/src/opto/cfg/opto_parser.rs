@@ -9,7 +9,7 @@ use crate::opto::{cfg::BB, Prg};
 //      the u8 -> json mapping is computed with an online as-needed basis rather than
 //      an offline batch job to avoid out of sync issues with upstream .bril and
 //      downstream .json artifacts see: https://github.com/sampsyo/bril/tree/main/benchmarks
-pub fn parse_bril2cfg(path: &Path) -> Result<Prg<bril::Instruction>, ParseError> {
+pub fn parse_bril2cfg(path: &Path) -> Result<Prg<bril::Code>, ParseError> {
     let src_bril = File::open(path)?;
     let u82json = Command::new("bril2json").stdout(Stdio::piped()).stdin(src_bril).spawn()?;
     let linear_prg = bril::load_program_from_read(u82json.stdout.unwrap());
@@ -39,7 +39,7 @@ pub fn parse_bril2cfg(path: &Path) -> Result<Prg<bril::Instruction>, ParseError>
         let (g, lbl2nid) =
         flbl2bb
         .into_iter()
-        .fold((e::AdjLinkedList::new(), HashMap::new()),|(mut g, mut lbl2nid):(AdjLinkedList<BB, (), usize>, HashMap<String, NodeIndex<usize>>), (lbl, bb)| {
+        .fold((e::AdjLinkedList::new(), HashMap::new()),|(mut g, mut lbl2nid):(AdjLinkedList<BB<bril::Code>, (), usize>, HashMap<String, NodeIndex<usize>>), (lbl, bb)| {
             let nid = g.add_node(bb);
             lbl2nid.insert(lbl, nid);
             (g, lbl2nid)
@@ -70,7 +70,7 @@ pub fn parse_bril2cfg(path: &Path) -> Result<Prg<bril::Instruction>, ParseError>
 //      1. mutable state to track keys must be used and
 //      2. allocation is necessary to avoid returning an iterator that references
 //         a stack value since .chunk_by() and .group_by() only iterate by reference.
-fn linf_to_bbs(function: impl Iterator<Item=bril::Code>) -> impl Iterator<Item=BB> {
+fn linf_to_bbs(function: impl Iterator<Item=bril::Code>) -> impl Iterator<Item=BB<bril::Code>> {
     let (mut id, mut bb_ended) = (0usize, true);
 
     let bbs = function
@@ -89,7 +89,7 @@ fn linf_to_bbs(function: impl Iterator<Item=bril::Code>) -> impl Iterator<Item=B
     bbs.into_iter()
 }
 
-fn bbs2cfg(f_bbs: impl Iterator<Item=BB>) -> e::AdjLinkedList<i32, i32, usize> {
+fn bbs2cfg(f_bbs: impl Iterator<Item=BB<bril::Code>>) -> e::AdjLinkedList<i32, i32, usize> {
     todo!()
 }
 

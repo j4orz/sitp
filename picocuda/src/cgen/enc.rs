@@ -1,5 +1,5 @@
-use crate::cgen::MachPrg;
+use crate::cgen::MachinePrg;
 
-pub fn encode(asmtree: MachPrg) -> Vec<u8> {
+pub fn encode(asmtree: MachinePrg) -> Vec<u8> {
     todo!()
 }

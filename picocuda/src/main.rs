@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::{io};
 
-use picoc::sema::{typer};
-use picoc::opto::{OptoConfig, OptoIR, OptoLevel, OptodPrg, self, cfg::opto_parser};
-use picoc::cgen::{isel, HostMachine, CC};
+use picocuda::sema::{typer};
+use picocuda::opto::{OptoConfig, OptoIR, OptoLevel, OptodPrg, self, cfg::opto_parser};
+use picocuda::cgen::{isel, HostMachine, CC};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let foo = println!("picocuda");

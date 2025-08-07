@@ -7,7 +7,7 @@ pub mod son;
 
 pub struct OptoConfig { pub ir: OptoIR, pub level: OptoLevel } impl OptoConfig { pub fn new(ir: OptoIR, level: OptoLevel) -> Self { Self { ir, level } } }
 pub enum OptoIR { Ast, Cfg, CfgSsa, Son } pub enum OptoLevel { O0, O1 }
-pub enum OptodPrg { Ast(Ast), Cfg(Prg<bril::Instruction>), CfgSsa(Prg<bril::Instruction>), Son }
+pub enum OptodPrg { Ast(Ast), Cfg(Prg<bril::Code>), CfgSsa(Prg<bril::Code>), Son }
 
 pub type Prg<I> = Vec<Fn<I>>;
 pub type Fn<I> = AdjLinkedList<BB<I>, (), usize>;

@@ -7,15 +7,15 @@ pub mod enc;
 pub mod exp;
 
 pub enum HostMachine { R5, ARM, X86 } pub enum CC { SystemV }
-pub enum MachinePrg { Ast(Ast), Cfg(Prg<riscv::Instr>), CfgSsa(Prg<riscv::Instr>), Son }
+pub enum MachinePrg { Ast(Ast), Cfg(Prg<r5::Instr>), CfgSsa(Prg<r5::Instr>), Son }
 
-mod riscv {
+mod r5 {
         // NB: parallelizing the compiler requires moving the static mutable counter into TLS
     //     also skipping 0 since node ids show up in bit vectors, work lists, etc.
     static mut VREG_COUNTER: u32 = 0;
     pub fn generate_vreg() -> u32 { unsafe { VREG_COUNTER += 1; VREG_COUNTER } }
 
-    pub enum R5OpCode {
+    pub enum Op {
         Int, Int8, Add, AddI, Sub, Lui, Auipc,
         Ret
     }    
@@ -23,11 +23,11 @@ mod riscv {
     pub struct Instr {
         // NB: machine instruction maintains retains semantic facts discovered/generated
         //     so 1. use->def facts (operands) and 2. registers (vreg/phyreg)
-        opcode: R5OpCode, operands: Box<[Instr]>, // Box<[]> keeps children operands fixed arity
+        opcode: Op, operands: Box<[Instr]>, // Box<[]> keeps children operands fixed arity
         vreg: u32, phyreg: Option<u32>,
     }
     impl Instr {
-        pub fn new(opcode: R5OpCode, operands: Box<[Instr]>) -> Self {
+        pub fn new(opcode: Op, operands: Box<[Instr]>) -> Self {
             Self { opcode, operands, vreg: generate_vreg(), phyreg: None, }
         }
     }

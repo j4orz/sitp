@@ -1,9 +1,9 @@
 
 use crate::opto::OptodPrg;
 use crate::sema::{Ast, Expr, Stmt};
-use crate::cgen::{MachPrg, R5MachInstr, R5OpCode, CC, HostMachine};
+use crate::cgen::{CC, HostMachine, MachinePrg, r5};
 
-pub fn sel(prg: OptodPrg, cpu: HostMachine, _cc: CC) -> MachPrg {
+pub fn sel(prg: OptodPrg, cpu: HostMachine, _cc: CC) -> MachinePrg {
     match cpu {
     HostMachine::R5 => {
         match prg {
@@ -25,21 +25,21 @@ pub fn sel(prg: OptodPrg, cpu: HostMachine, _cc: CC) -> MachPrg {
     todo!()
 }
 
-pub fn sel_r5stmt(prg: Ast) -> Vec<R5MachInstr> {
+pub fn sel_r5stmt(prg: Ast) -> Vec<r5::Instr> {
     let mut aasm = vec![];
 
     for s in prg { match s {
         Stmt::Ret(e) => {
             let expr = sel_r5expr(e);
             let operands = Box::new([expr]);
-            let ret = R5MachInstr::new(R5OpCode::Ret, operands);
+            let ret = r5::Instr::new(r5::Op::Ret, operands);
             aasm.push(ret)
         },
     }}
     aasm
 }
 
-fn sel_r5expr(e: Expr) -> R5MachInstr { match e {
+fn sel_r5expr(e: Expr) -> r5::Instr { match e {
     Expr::Con(c) => r5con(c),
     Expr::Add(_, _) => r5add(),
     Expr::Sub(_, _) => r5sub(),
@@ -47,12 +47,12 @@ fn sel_r5expr(e: Expr) -> R5MachInstr { match e {
     Expr::Div(_, _) => r5div(),
 }}
 
-fn r5con(c: i128) -> R5MachInstr {
+fn r5con(c: i128) -> r5::Instr {
     let operands = Box::new([]);
-    if imm12(c) { R5MachInstr::new(R5OpCode::Int, operands) }
-    else if imm20exact(c) { R5MachInstr::new(R5OpCode::Lui, operands) }
-    else if imm32(c) { R5MachInstr::new(R5OpCode::AddI, operands) }
-    else { R5MachInstr::new(R5OpCode::Int8, operands) }
+    if imm12(c) { r5::Instr::new(r5::Op::Int, operands) }
+    else if imm20exact(c) { r5::Instr::new(r5::Op::Lui, operands) }
+    else if imm32(c) { r5::Instr::new(r5::Op::AddI, operands) }
+    else { r5::Instr::new(r5::Op::Int8, operands) }
 }
 
 // private Node addf(AddFNode addf) {
@@ -64,7 +64,7 @@ fn r5con(c: i128) -> R5MachInstr {
 //         return new AddIRISC(add, (int)ti.value(),true);
 //     return new AddRISC(add);
 // }
-fn r5add() -> R5MachInstr { todo!() }
+fn r5add() -> r5::Instr { todo!() }
 fn imm12(c: i128) -> bool { todo!() }
 fn imm20exact(c: i128) -> bool { todo!() }
 fn imm32(c: i128) -> bool { todo!() }
@@ -75,12 +75,12 @@ fn imm32(c: i128) -> bool { todo!() }
 //         : new SubRISC(sub);
 // }
 
-fn r5sub() -> R5MachInstr { todo!() }
+fn r5sub() -> r5::Instr { todo!() }
 
 // case MulFNode    mulf -> new MulFRISC(mulf);
 // case MulNode      mul -> new MulRISC(mul);
-fn r5mul() -> R5MachInstr { todo!() }
+fn r5mul() -> r5::Instr { todo!() }
 
 // case DivFNode    divf -> new DivFRISC(divf);
 // case DivNode      div -> new DivRISC(div);
-fn r5div() -> R5MachInstr { todo!() }
+fn r5div() -> r5::Instr { todo!() }

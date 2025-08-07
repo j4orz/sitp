@@ -25,6 +25,6 @@ pub mod opto_parser;
     // output_prg
 // }
 
-fn lvn(input: BB) -> BB {
+fn lvn(input: BB<bril::Instruction>) -> BB<bril::Instruction> {
     todo!()
 }
