@@ -58,9 +58,10 @@ pub trait Index: Copy + Default + Hash + Ord + Debug + 'static {
 }
 
 #[derive(Clone, Copy, PartialEq)] pub struct NodeIndex<I>(I);
-impl<I> NodeIndex<I> { pub fn new(i: I) -> Self { NodeIndex(i)}}
-
 #[derive(Clone, Copy, PartialEq)] pub struct EdgeIndex<I>(I);
+impl<I> NodeIndex<I> { pub fn new(i: I) -> Self { NodeIndex(i)}}
+impl<I> EdgeIndex<I> { pub fn new(i: I) -> Self { EdgeIndex(i)}}
+
 // pub const INVALID_EDGE_INDEX: EdgeIndex = EdgeIndex(usize::MAX);
 // const OUTGOING: usize = 0;
 // const INCOMING: usize = 1;
@@ -116,8 +117,19 @@ mod test_adjll {
 // _____________________________________________________________________________
 
 
+impl Graph for AdjMat {
+    type NId;
+    type EId;
 
+    fn node_ids(&self) -> impl Iterator<Item=Self::NId> { todo!() }
+    fn neighbors(&self, v: Self::NId) -> impl Iterator<Item=Self::NId> { todo!() }
 
+    type Map;
+    fn visit_map(&self) -> Self::Map { todo!() }
+    fn reset_map(&self, map: &mut Self::Map) { todo!() }
+}
+pub struct AdjMat {}
+impl AdjMat {}
 
 pub struct AdjHashMap<N, E, Idx> { nodes: Vec<AdjLLNode<N, Idx>>, edges: Vec<AdjLLEdge<E, Idx>> }
 impl<N, E, Idx> AdjHashMap<N, E, Idx> {

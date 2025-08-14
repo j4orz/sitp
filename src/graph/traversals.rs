@@ -1,5 +1,5 @@
 use std::collections::{HashSet, VecDeque};
-use crate::graphs::{Graph, VisitMap};
+use crate::graph::{Graph, VisitMap};
 
 pub struct IntoBfs<G: Graph> { pub g: G, pub q: VecDeque<G::NId>, pub visited: G::Map }
 impl<G: Graph> Iterator for IntoBfs<G> {
