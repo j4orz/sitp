@@ -1,5 +1,6 @@
-mod mst;
+mod cc;
 mod sp;
+mod mst;
 
 use std::collections::{HashSet, VecDeque};
 
@@ -23,10 +24,7 @@ impl Iterator for IntoBfs {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(i) = self.q.pop_front() {
-            for j in &self.g.al[i] {
-                if !self.v.contains(&j) { self.q.push_back(j.clone()); }
-            }
-
+            for j in &self.g.al[i] { if !self.v.contains(&j) { self.q.push_back(j.clone()); } }
             return Some(i);
         }
         
