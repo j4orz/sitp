@@ -1,7 +1,24 @@
 use elements::graph::Graph;
+use elements::iterator::List;
 
 fn main() {
     println!("Hello, world!");
+    let mut l = List::new();
+    l.push(1); l.push(2); l.push(3);
+
+    let mut l2 = List::map(&l, |x| {
+        x * 2
+    });
+
+    println!("{:?}", l.pop());
+    println!("{:?}", l.pop());
+    println!("{:?}", l.pop());
+
+    println!("{:?}", l2.pop());
+    println!("{:?}", l2.pop());
+    println!("{:?}", l2.pop());
+
+
     let g = Graph::new(vec![
         vec![1, 2, 7, 8],
         vec![3, 4],
