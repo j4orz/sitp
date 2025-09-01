@@ -1,5 +1,5 @@
 [package]
-name = "picograd"
+name = "picotorch"
 version = "0.1.0"
 edition = "2024"
 

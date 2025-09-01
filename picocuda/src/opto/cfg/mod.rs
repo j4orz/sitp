@@ -1,4 +1,4 @@
-use stdnot::graphs::{self as e, index::NodeIndex, AdjLinkedList, Graph};
+use stdnot::graph::{self as e, AdjLinkedList, Graph};
 
 use crate::opto::{Prg, BB};
 
