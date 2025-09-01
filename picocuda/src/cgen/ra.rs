@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use elements::graphs::AdjLinkedList;
+use stdnot::graphs::AdjLinkedList;
 use crate::{cgen::{r5, MachinePrg}, opto::{Prg, Fn}};
 
 pub fn alloc(aabsasm: MachinePrg) -> MachinePrg {

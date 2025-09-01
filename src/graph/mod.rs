@@ -23,14 +23,22 @@ impl Iterator for IntoBfs {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(i) = self.q.pop_front() {
+        self.q.pop_front().map(|i| {
             for j in &self.g.al[i] { if !self.v.contains(&j) { self.q.push_back(j.clone()); } }
             return Some(i);
-        }
-        
-        None
+        })?
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use quickcheck::quickcheck;
+//     quickcheck! {
+//         fn property() -> bool {
+//             true
+//         }
+//     }
+// }
 
 // //!            space            read                     update            delete
 // //! adjlist

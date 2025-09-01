@@ -1,4 +1,4 @@
-use elements::graphs::AdjLinkedList;
+use stdnot::graphs::AdjLinkedList;
 use crate::sema::Ast;
 
 pub mod cfg;

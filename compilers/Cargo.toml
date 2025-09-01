@@ -1,3 +1,0 @@
-[workspace]
-resolver = "3"
-members = ["picocuda", "picograd", "vendor/elements"]

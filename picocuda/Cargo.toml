@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 thiserror = "2.0.12"
 bril = { git = "https://github.com/sampsyo/bril", package = "bril-rs" }
-elements = { path = "../vendor/elements" }
+stdnot = { path = "../stdnot" }
 itertools = "0.14.0"
 
 [dev-dependencies]

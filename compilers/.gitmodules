@@ -1,6 +1,0 @@
-[submodule "vendor/bril"]
-	path = vendor/bril
-	url = https://github.com/sampsyo/bril.git
-[submodule "vendor/elements"]
-	path = vendor/elements
-	url = https://github.com/j4orz/elements.git

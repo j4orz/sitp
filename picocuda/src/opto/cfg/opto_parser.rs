@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs::File, io, path::Path, process::{Command, Stdio}};
+use stdnot::graphs::{self as e, index::NodeIndex, AdjLinkedList, Graph};
 use itertools::Itertools;
-use elements::graphs::{self as e, index::NodeIndex, AdjLinkedList, Graph};
 
 use crate::opto::{cfg::BB, Prg};
 
