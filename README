@@ -1,4 +1,0 @@
-elements is a collection of generic algorithms implemented in rust.
-
-the algorithms were previously implemented in typescript, located in master-old.
-they are buggy and slow, but the accompanied lecture videos may still be useful.
