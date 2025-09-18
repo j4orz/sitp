@@ -1,4 +1,4 @@
-use crate::{Device, Dtype, DtypeVal, Layout};
+use crate::{ops::cpu_ops::{forward_cpu, OpForwardError, ReduceDimInput}, pyten, Device, Dtype, DtypeVal, Layout};
 use pyo3::prelude::*;
 use rand::{Rng, distr::Uniform};
 use std::{
@@ -570,14 +570,10 @@ impl Tensor {
 
 
 use crate::{
-    Device, DtypeVal,
     rsten::{self},
-    foo::Tensor,
 };
-use cpu_ops::{OpForwardError, ReduceDimInput, forward_cpu};
 // use cuda_ops::forward_cuda;
 use std::{
-    collections::HashSet,
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
@@ -623,7 +619,7 @@ impl Tensor {
     }
 
     pub fn backward(&self) -> () {
-        self.storage.borrow_mut().grad = Some(ones(self.shape.clone()));
+        self.storage.borrow_mut().grad = Some(pyten::ones(self.shape.clone()));
         self._backward();
         for tensor in self.topo().iter().rev() {
             tensor._backward();
@@ -690,7 +686,7 @@ pub fn backward_cpu(op: &Op, opout: &Tensor, dFdx: &Tensor) -> Vec<Tensor> {
             // d(tanh)dx: 1-tanh(x)^2
             let tanh_x = opout;
             let (ones_tensor, tanh_squared) =
-                (ones(tanh_x.shape.clone()), (tanh_x * tanh_x).unwrap());
+                (pyten::ones(tanh_x.shape.clone()), (tanh_x * tanh_x).unwrap());
             let dfdx = (&ones_tensor - &tanh_squared).unwrap();
 
             vec![(&dfdx * &dFdx.clone()).unwrap()] // chain rule
@@ -724,7 +720,7 @@ impl Add<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn add(self, rhs: f32) -> Self::Output {
-        let op = Op::Add(self.clone(), tpy::new(vec![DtypeVal::Float32(rhs)]));
+        let op = Op::Add(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
         let output = self.forward(&op);
         output
     }
@@ -744,7 +740,7 @@ impl Sub<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn sub(self, rhs: f32) -> Self::Output {
-        let op = Op::Sub(self.clone(), tpy::new(vec![DtypeVal::Float32(rhs)]));
+        let op = Op::Sub(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
         let output = self.forward(&op);
         output
     }
@@ -763,7 +759,7 @@ impl Mul<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        let op = Op::Mul(self.clone(), tpy::new(vec![DtypeVal::Float32(rhs)]));
+        let op = Op::Mul(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
         let output = self.forward(&op);
         output
     }
@@ -773,7 +769,7 @@ impl Mul<&Tensor> for f32 {
     type Output = Result<Tensor, OpForwardError>;
 
     fn mul(self, rhs: &Tensor) -> Self::Output {
-        let op = Op::Mul(tpy::new(vec![DtypeVal::Float32(self)]), rhs.clone());
+        let op = Op::Mul(pyten::new(vec![DtypeVal::Float32(self)]), rhs.clone());
         let output = rhs.forward(&op);
         output
     }
@@ -793,7 +789,7 @@ impl Div<f32> for &Tensor {
     type Output = Result<Tensor, OpForwardError>;
 
     fn div(self, rhs: f32) -> Self::Output {
-        let op = Op::Div(self.clone(), tpy::new(vec![DtypeVal::Float32(rhs)]));
+        let op = Op::Div(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
         let output = self.forward(&op);
         output
     }

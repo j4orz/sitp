@@ -1,7 +1,5 @@
 use crate::{
-    rsten::{self, Storage, Tensor, ViewOpError},
-    foo::Op,
-    Dtype, DtypeVal
+    pyten::{self}, rsten::{self, Op, Storage, Tensor, ViewOpError}, Dtype, DtypeVal
 };
 use std::{
     cell::RefCell,
@@ -83,7 +81,7 @@ where
 {
     let (x, y, z) = if x.shape != y.shape {
         let z_shape = Tensor::broadcast_shape(&x.shape, &y.shape)?;
-        let z = rsten::zeros(z_shape, Dtype::Float32); // clone because of python/rust memory mismatch
+        let z = pyten::zeros(z_shape, Dtype::Float32); // clone because of python/rust memory mismatch
 
         let (x_stride, y_stride) = (
             Tensor::clamp_stride(&x.shape),
@@ -96,7 +94,7 @@ where
 
         (x, y, z)
     } else {
-        let z = rsten::zeros(x.shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
+        let z = pyten::zeros(x.shape.clone(), Dtype::Float32); // clone because of python/rust memory mismatch
         (x.clone(), y.clone(), z) // TODO: possibly remove taking view just to satisfy typechecker
     };
 
@@ -171,7 +169,7 @@ where
                 .enumerate()
                 .map(|(i, &dim_size)| if i == dim { 1 } else { dim_size })
                 .collect();
-            let mut y = rsten::zeros(y_shape, Dtype::Float32);
+            let mut y = pyten::zeros(y_shape, Dtype::Float32);
 
             {
                 let (x_storage, mut y_storage) = (x.storage.borrow(), y.storage.borrow_mut());
@@ -212,7 +210,7 @@ fn matmul_cpu(X: &Tensor, Y: &Tensor) -> Result<Tensor, OpForwardError> {
     assert_eq!(M1, M2, "Shape mismatch in operation");
     assert_eq!(X.ndim, 2, "X must be a 2D tensor");
     assert_eq!(Y.ndim, 2, "Y must be a 2D tensor");
-    let Z = rsten::zeros(vec![N, P], Dtype::Float32);
+    let Z = pyten::zeros(vec![N, P], Dtype::Float32);
 
     {
         let (X_storage, Y_storage, mut Z_storage) = (
