@@ -7,28 +7,15 @@ pub mod linalg; // cublas
 pub mod nn; // cudnn
 pub mod ops;
 pub mod storage;
+pub mod ir; // tinygrad-style IR Ops and groupings
 
 use pyo3::{FromPyObject, IntoPyObject, pyclass};
 
-#[rustfmt::skip]
-#[pyclass(eq)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Device { Cpu, Gpu, Cuda, }
+#[pyclass(eq)] #[derive(Clone, Debug, PartialEq)] pub enum Device { Cpu, Gpu, Cuda, }
+#[pyclass(eq)] #[derive(Clone, Debug, PartialEq)] pub enum Layout { Strided  } // Sparse, // MklDnn
+#[pyclass(eq)] #[derive(Clone, Debug, PartialEq)] pub enum Dtype { Bool, Float32, Float64, Int32, Int64}
 
-#[rustfmt::skip]
-#[pyclass(eq)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Layout { Strided  } // Sparse, // MklDnn
-
-#[rustfmt::skip]
-#[pyclass(eq)]
-#[derive(Clone, Debug, PartialEq)]
-pub enum Dtype { Bool, Float32, Float64, Int32, Int64}
-
-#[rustfmt::skip]
-#[derive(FromPyObject)]
-#[derive(IntoPyObject)]
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(FromPyObject)] #[derive(IntoPyObject)] #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum DtypeVal { Bool(bool), Float32(f32), Float64(f64), Int16(i16), Int32(i32), Int64(i64) } // f16 is unstable
 
 impl From<i32> for DtypeVal {
