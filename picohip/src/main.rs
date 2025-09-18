@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::{io};
 
-use picocuda::sema::{typer};
+use picohip::sema::{typer};
 // use picocuda::opto::{OptoConfig, OptoIR, OptoLevel, OptodPrg, self, cfg::opto_parser};
 // use picocuda::cgen::{isel, HostMachine, CC};
 

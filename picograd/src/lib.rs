@@ -1,12 +1,12 @@
 #![allow(non_snake_case)]
-// frontend
-pub mod nn;
+
+pub mod pyten;
+pub mod rsten;
+// pub mod foo;
+pub mod linalg; // cublas
+pub mod nn; // cudnn
+pub mod ops;
 pub mod storage;
-
-// middleend
-
-// backend
-// pub mod ops;
 
 use pyo3::{FromPyObject, IntoPyObject, pyclass};
 

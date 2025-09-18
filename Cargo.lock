@@ -257,23 +257,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
-name = "picocuda"
+name = "picograd"
+version = "0.1.0"
+dependencies = [
+ "numpy",
+ "pyo3",
+ "rand",
+ "stdnot",
+ "thiserror",
+]
+
+[[package]]
+name = "picohip"
 version = "0.1.0"
 dependencies = [
  "bril-rs",
  "insta",
  "itertools",
  "stdnot",
- "thiserror",
-]
-
-[[package]]
-name = "picotorch"
-version = "0.1.0"
-dependencies = [
- "numpy",
- "pyo3",
- "rand",
  "thiserror",
 ]
 

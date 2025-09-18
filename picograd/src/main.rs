@@ -1,18 +1,6 @@
 use picograd::Device;
 
 fn main() {
-    println!(
-        "
-    ⠀⠀⠀⠀⠀⣼⣧⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⣼⣿⣿⣧⠀⠀⠀⠀
-    ⠀⠀⠀⠾⠿⠿⠿⠿⠷⠀⠀⠀
-    ⠀⠀⣼⣆⠀⠀⠀⠀⣰⣧⠀⠀
-    ⠀⣼⣿⣿⣆⠀⠀⣰⣿⣿⣧⠀
-    ⠾⠟⠿⠿⠿⠧⠼⠿⠿⠿⠻⠷
-    picograd: tensor->triton
-    "
-    );
-
     // TODO: -smell?: map_err: tensor/op error -> python error in lib_py.rs
     // TODO: unwraps(), todos, fixmes. wrap a bow.
     // let device = Device::Gpu;
