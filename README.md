@@ -1,12 +1,13 @@
 ![](./flam.webp)
 
-# SCTP
+# SITP
 
 This repository provides the official implementations for the
-[Structure and Compilation of Tensor Programs](https://j4orz.ai/sctp) textbook,
-which compiles differentiable and parallel programming languages from scratch.
-This includes pedgaogical implementations of transformers, pytorch, and cuda,
-each a member package of the cargo workspace, whic his rust's monorepo functionality.
+[Structure and Interpretation of Tensor Programs](https://j4orz.ai/sctp) textbook,
+which interprets and compiles differentiable and parallel programming languages
+from scratch. This includes pedgaogical implementations of transformers, pytorch,
+and cuda, each a member package of the cargo workspace, whic his rust's monorepo
+functionality.
 
 ## Citation
 If you use this codebase, or otherwise find the textbook valuable, please cite:
