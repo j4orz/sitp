@@ -20,6 +20,58 @@ impl From<ViewOpError> for PyErr {
     }
 }
 
+#[pymodule]
+fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
+    // m.add_class::<Tensor>()?;
+
+    // constructors
+    pg_m.add_function(wrap_pyfunction!(tensor, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(zeros, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(ones, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(randint, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(randn, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(arange, pg_m)?)?;
+
+    // samplers
+    pg_m.add_function(wrap_pyfunction!(multinomial, pg_m)?)?;
+
+    // ops
+    pg_m.add_function(wrap_pyfunction!(tanh, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(exp, pg_m)?)?;
+    pg_m.add_function(wrap_pyfunction!(log, pg_m)?)?;
+
+    // nn.functional/nn
+    let ff_m = PyModule::new(py, "functional")?;
+    ff_m.add_function(wrap_pyfunction!(nn::cross_entropy, &ff_m)?)?;
+    ff_m.add_function(wrap_pyfunction!(softmax, &ff_m)?)?;
+    let nn_m = PyModule::new(py, "nn")?;
+    nn_m.add_submodule(&ff_m)?;
+    pg_m.add_submodule(&nn_m)?;
+
+    // BUG: see pyo3/issues/759: https://github.com/PyO3/pyo3/issues/759#issuecomment-977835119
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("picograd.nn", nn_m)?;
+
+    py.import("sys")?
+        .getattr("modules")?
+        .set_item("picograd.nn.functional", ff_m)?;
+
+    Ok(())
+}
+
+fn register_nn_module(parent_module: &Bound<'_, PyModule>) -> PyResult<()> {
+    let nn_m = PyModule::new(parent_module.py(), "nn")?;
+    register_nn_functional_module(&nn_m)?;
+    parent_module.add_submodule(&nn_m)
+}
+
+fn register_nn_functional_module(parent_module: &Bound<'_, PyModule>) -> PyResult<()> {
+    let functional_m = PyModule::new(parent_module.py(), "functional")?;
+    functional_m.add_function(wrap_pyfunction!(nn::cross_entropy, &functional_m)?)?;
+    parent_module.add_submodule(&functional_m)
+}
+
 // todo: requires_grad: bool
 #[pyfunction]
 pub fn new(data: Vec<DtypeVal>) -> Tensor {
@@ -42,15 +94,8 @@ pub fn ones(shape: Vec<usize>) -> Tensor {
     rsten::alloc(&shape, data)
 }
 
-#[pyfunction]
-pub fn randint(low: i32, high: i32, shape: Vec<usize>) -> Tensor {
-    Tensor::randint(low, high, &shape)
-}
-
-#[pyfunction]
-pub fn randn(shape: Vec<usize>) -> Tensor {
-    Tensor::randn(&shape)
-}
+#[pyfunction] pub fn randint(low: i32, high: i32, shape: Vec<usize>) -> Tensor { Tensor::randint(low, high, &shape) }
+#[pyfunction] pub fn randn(shape: Vec<usize>) -> Tensor { Tensor::randn(&shape) }
 
 #[pyfunction]
 pub fn multinomial(dist: &Tensor, num_samples: usize, replacement: bool) -> Tensor {
@@ -133,53 +178,19 @@ impl Tensor {
     //     Ok(self.no_alloc(shape))
     // }
 
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("{}", self))
-    }
+    fn __repr__(&self) -> PyResult<String> { Ok(format!("{}", self)) }
 
-    fn __getitem__(&self, I: Tensor) -> PyResult<Self> {
-        Ok(self.getitem_embedding(&I))
-    }
+    fn __getitem__(&self, I: Tensor) -> PyResult<Self> { Ok(self.getitem_embedding(&I)) }
 
-    #[getter]
-    fn ndim(&self) -> usize {
-        self.ndim
-    }
+    #[getter] fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> { PyTuple::new(py, &self.shape) }
+    #[getter] fn ndim(&self) -> usize { self.ndim }
+    #[getter] fn requires_grad(&self) -> bool { self.requires_grad }
+    #[setter] fn set_requires_grad(&mut self, value: bool) { self.requires_grad = value; }
+    #[getter] fn stride(&self) -> Vec<usize> { self.stride.clone() }
 
-    #[getter]
-    fn shape<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        PyTuple::new(py, &self.shape)
-    }
-
-    #[getter]
-    fn requires_grad(&self) -> bool {
-        self.requires_grad
-    }
-
-    #[setter]
-    fn set_requires_grad(&mut self, value: bool) {
-        self.requires_grad = value;
-    }
-
-    #[getter]
-    fn stride(&self) -> Vec<usize> {
-        self.stride.clone()
-    }
-
-    #[getter]
-    fn device(&self) -> Device {
-        self.device.clone()
-    }
-
-    #[getter]
-    fn layout(&self) -> Layout {
-        self.layout.clone()
-    }
-
-    #[getter]
-    fn dtype(&self) -> Dtype {
-        self.dtype.clone()
-    }
+    #[getter] fn device(&self) -> Device { self.device.clone() }
+    #[getter] fn layout(&self) -> Layout { self.layout.clone() }
+    #[getter] fn dtype(&self) -> Dtype { self.dtype.clone() }
 
     // VIEW OPS
     fn reshape(&self, shape: Bound<'_, PyTuple>) -> PyResult<Tensor> {
@@ -222,43 +233,27 @@ impl Tensor {
 
     // POINTWISE OPS
     fn __add__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
-        if let Ok(val) = other.extract::<f32>() {
-            Ok(self.add(val)?)
-        } else if let Ok(t2) = other.extract::<Tensor>() {
-            Ok(self.add(&t2)?)
-        } else {
-            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
-        }
+        if let Ok(val) = other.extract::<f32>() { Ok(self.add(val)?) }
+        else if let Ok(t2) = other.extract::<Tensor>() { Ok(self.add(&t2)?) }
+        else { Err(PyRuntimeError::new_err("expected a tensor or scalar")) }
     }
 
     fn __sub__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
-        if let Ok(val) = other.extract::<f32>() {
-            Ok(self.sub(val)?)
-        } else if let Ok(t2) = other.extract::<Tensor>() {
-            Ok(self.sub(&t2)?)
-        } else {
-            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
-        }
+        if let Ok(val) = other.extract::<f32>() { Ok(self.sub(val)?) }
+        else if let Ok(t2) = other.extract::<Tensor>() { Ok(self.sub(&t2)?) }
+        else { Err(PyRuntimeError::new_err("expected a tensor or scalar")) }
     }
 
     fn __mul__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
-        if let Ok(val) = other.extract::<f32>() {
-            Ok(self.mul(val)?)
-        } else if let Ok(t2) = other.extract::<Tensor>() {
-            Ok(self.mul(&t2)?)
-        } else {
-            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
-        }
+        if let Ok(val) = other.extract::<f32>() { Ok(self.mul(val)?) }
+        else if let Ok(t2) = other.extract::<Tensor>() { Ok(self.mul(&t2)?) }
+        else { Err(PyRuntimeError::new_err("expected a tensor or scalar")) }
     }
 
     fn __truediv__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
-        if let Ok(val) = other.extract::<f32>() {
-            Ok(self.div(val)?)
-        } else if let Ok(t2) = other.extract::<Tensor>() {
-            Ok(self.div(&t2)?)
-        } else {
-            Err(PyRuntimeError::new_err("expected a tensor or scalar"))
-        }
+        if let Ok(val) = other.extract::<f32>() { Ok(self.div(val)?) }
+        else if let Ok(t2) = other.extract::<Tensor>() { Ok(self.div(&t2)?) }
+        else { Err(PyRuntimeError::new_err("expected a tensor or scalar")) }
     }
 
     #[pyo3(signature=(dim=None, keepdim=None))]
@@ -313,13 +308,10 @@ pub fn tensor<'py>(data: Bound<'py, PyAny>) -> PyResult<Tensor> {
         Ok(rsten::alloc(&shape, data))
     }
 
-    if let Ok(np) = data.downcast::<numpy::PyArrayDyn<i32>>() {
-        return alloc_from_np(np);
-    } else if let Ok(np) = data.downcast::<numpy::PyArrayDyn<i64>>() {
-        return alloc_from_np(np);
-    } else if let Ok(np) = data.downcast::<numpy::PyArrayDyn<f32>>() {
-        return alloc_from_np(np);
-    } else if let Ok(pylist) = data.downcast::<PyList>() {
+    if let Ok(np) = data.downcast::<numpy::PyArrayDyn<i32>>() { return alloc_from_np(np); }
+    else if let Ok(np) = data.downcast::<numpy::PyArrayDyn<i64>>() { return alloc_from_np(np); }
+    else if let Ok(np) = data.downcast::<numpy::PyArrayDyn<f32>>() { return alloc_from_np(np); }
+    else if let Ok(pylist) = data.downcast::<PyList>() {
         let (mut data, mut shape) = (Vec::new(), Vec::new());
         flatten_pylist(pylist.as_any(), &mut data, &mut shape, 1)?;
         // println!("moose {:?}", data);
@@ -353,68 +345,6 @@ fn flatten_pylist<'py>(
     Ok(())
 }
 
-#[pyfunction]
-fn tanh(x: Tensor) -> PyResult<Tensor> {
-    x.tanh().map_err(|e| PyRuntimeError::new_err(e.to_string()))
-}
-
-#[pyfunction]
-fn exp(x: Tensor) -> PyResult<Tensor> {
-    x.exp().map_err(|e| PyRuntimeError::new_err(e.to_string()))
-}
-
-#[pyfunction]
-fn log(x: Tensor) -> PyResult<Tensor> {
-    x.log().map_err(|e| PyRuntimeError::new_err(e.to_string()))
-}
-
-#[pymodule]
-fn picograd(py: Python, pg_m: &Bound<'_, PyModule>) -> PyResult<()> {
-    // m.add_class::<Tensor>()?;
-
-    // constructors
-    pg_m.add_function(wrap_pyfunction!(tensor, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(zeros, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(ones, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(randint, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(randn, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(arange, pg_m)?)?;
-
-    // samplers
-    pg_m.add_function(wrap_pyfunction!(multinomial, pg_m)?)?;
-
-    // ops
-    pg_m.add_function(wrap_pyfunction!(tanh, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(exp, pg_m)?)?;
-    pg_m.add_function(wrap_pyfunction!(log, pg_m)?)?;
-
-    // nn.functional/nn
-    let ff_m = PyModule::new(py, "functional")?;
-    ff_m.add_function(wrap_pyfunction!(nn::cross_entropy, &ff_m)?)?;
-    ff_m.add_function(wrap_pyfunction!(softmax, &ff_m)?)?;
-    let nn_m = PyModule::new(py, "nn")?;
-    nn_m.add_submodule(&ff_m)?;
-    pg_m.add_submodule(&nn_m)?;
-
-    // BUG: see pyo3/issues/759: https://github.com/PyO3/pyo3/issues/759#issuecomment-977835119
-    py.import("sys")?
-        .getattr("modules")?
-        .set_item("picograd.nn", nn_m)?;
-
-    py.import("sys")?
-        .getattr("modules")?
-        .set_item("picograd.nn.functional", ff_m)?;
-
-    Ok(())
-}
-
-// fn register_nn_module(parent_module: &Bound<'_, PyModule>) -> PyResult<()> {
-//     let nn_m = PyModule::new(parent_module.py(), "nn")?;
-//     register_nn_functional_module(&nn_m)?;
-//     parent_module.add_submodule(&nn_m)
-// }
-
-// fn register_nn_functional_module(parent_module: &Bound<'_, PyModule>) -> PyResult<()> {
-//     let functional_m = PyModule::new(parent_module.py(), "functional")?;
-//     functional_m.add_function(wrap_pyfunction!(nn::cross_entropy, &functional_m)?)?;
-//     parent_module.add_submodule(&functional_m)
+#[pyfunction] fn tanh(x: Tensor) -> PyResult<Tensor> { x.tanh().map_err(|e| PyRuntimeError::new_err(e.to_string())) }
+#[pyfunction] fn exp(x: Tensor) -> PyResult<Tensor> { x.exp().map_err(|e| PyRuntimeError::new_err(e.to_string())) }
+#[pyfunction] fn log(x: Tensor) -> PyResult<Tensor> { x.log().map_err(|e| PyRuntimeError::new_err(e.to_string())) }
