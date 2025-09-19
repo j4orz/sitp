@@ -1,20 +1,57 @@
-use crate::{ops::cpu_ops::{forward_cpu, OpForwardError, ReduceDimInput}, pyten, Device, Dtype, DtypeVal, Layout};
+use crate::{opscpu::{forward_cpu, OpForwardError, ReduceDimInput}, pyten, Device, Dtype, DtypeVal, Layout};
+use std::{ cell::RefCell, cmp::{Ordering, max}, collections::HashSet, fmt::{self, Display}, hash, iter, rc::Rc, ops::{Add, Div, Mul, Neg, Sub} };
 use pyo3::prelude::*;
 use rand::{Rng, distr::Uniform};
-use std::{
-    cell::RefCell,
-    cmp::{Ordering, max},
-    collections::HashSet,
-    fmt::{self, Display},
-    hash, iter,
-    rc::Rc,
-};
 use thiserror::Error;
+
+#[pyclass(unsendable)]
+pub struct Tensor {
+    pub ndim: usize, pub shape: Vec<usize>, pub stride: Vec<usize>,
+    pub input_op: Option<Box<Op>>, pub requires_grad: bool,
+    pub storage: Rc<RefCell<Storage<DtypeVal>>>, pub device: Device, pub layout: Layout, pub dtype: Dtype,
+}
+
+#[derive(Clone)]
+pub enum Op {
+    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binops (zip)
+    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // uops (map)
+    Sum(Tensor, Option<ReduceDimInput>), Max(Tensor, Option<ReduceDimInput>) // reduce
+}
+
+#[derive(Clone)]
+pub struct Storage<DtypeVal> {
+    pub data: Vec<DtypeVal>,
+    pub grad: Option<Tensor>,
+}
+
+impl Tensor {
+    // ***transcendental***
+    pub fn exp(&self) -> Result<Tensor, OpForwardError> { self.forward(&Op::Exp(self.clone())) }
+    pub fn log(&self) -> Result<Tensor, OpForwardError> { self.forward(&Op::Log(self.clone())) }
+    // ***linear/non-linear***
+    pub fn matmul(&self, other: &Tensor) -> Result<Tensor, OpForwardError> { self.forward(&Op::Matmul(self.clone(), other.clone())) }
+    pub fn sinh(&self) -> Result<Tensor, OpForwardError> { self.forward(&Op::Sinh(self.clone())) }
+    pub fn cosh(&self) -> Result<Tensor, OpForwardError> { self.forward(&Op::Cosh(self.clone())) }
+    pub fn tanh(&self) -> Result<Tensor, OpForwardError> { self.forward(&Op::Tanh(self.clone())) }
+    // ***reductions***
+    pub fn _sum(&self, rdi: Option<ReduceDimInput>) -> Result<Tensor, OpForwardError> { self.forward(&Op::Sum(self.clone(), rdi)) }
+    pub fn max(&self, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> { let rdi = ReduceDimInput { dim, keepdim }; self.forward(&Op::Max(self.clone(), Some(rdi))) }
+}
+
+impl Neg for &Tensor { type Output = Result<Tensor, OpForwardError>; fn neg(self) -> Self::Output { self.forward(&Op::Neg(self.clone())) } }
+impl Add for &Tensor { type Output = Result<Tensor, OpForwardError>; fn add(self, rhs: &Tensor) -> Self::Output { self.forward(&Op::Add(self.clone(), rhs.clone())) } }
+impl Add<f32> for &Tensor { type Output = Result<Tensor, OpForwardError>; fn add(self, rhs: f32) -> Self::Output { self.forward(&Op::Add(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]))) } }
+impl Sub for &Tensor { type Output = Result<Tensor, OpForwardError>; fn sub(self, rhs: &Tensor) -> Self::Output { self.forward(&Op::Sub(self.clone(), rhs.clone())) } }
+impl Sub<f32> for &Tensor { type Output = Result<Tensor, OpForwardError>; fn sub(self, rhs: f32) -> Self::Output { self.forward(&Op::Sub(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]))) } }
+impl Mul<f32> for &Tensor { type Output = Result<Tensor, OpForwardError>; fn mul(self, rhs: f32) -> Self::Output { self.forward(&Op::Mul(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]))) } }
+impl Mul<&Tensor> for f32 { type Output = Result<Tensor, OpForwardError>; fn mul(self, rhs: &Tensor) -> Self::Output { rhs.forward(&Op::Mul(pyten::new(vec![DtypeVal::Float32(self)]), rhs.clone())) } }
+impl Div for &Tensor { type Output = Result<Tensor, OpForwardError>; fn div(self, rhs: &Tensor) -> Self::Output { self.forward(&Op::Div(self.clone(), rhs.clone())) } }
+impl Div<f32> for &Tensor { type Output = Result<Tensor, OpForwardError>; fn div(self, rhs: f32) -> Self::Output { self.forward(&Op::Div(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]))) } }
 
 // Tensor
 // ------
 // storage: two design decisions
-//      1. lifetimes Box<_> vs Rc<_> dgh
+//      1. lifetimes Box<_> vs Rc<_>
 //      2. mutation: RefCell<_>(safe) vs UnsafeCell<_>(speed)j
 // impl Tensor:
 // - CONSTRUCTORS (alloc): alloc
@@ -28,116 +65,18 @@ use thiserror::Error;
 // - unsendable: does pytorch user code multithread tensors?
 // - dtype not typed with storage
 
-#[pyclass(unsendable)]
-pub struct Tensor {
-    pub ndim: usize,
-    pub shape: Vec<usize>,
-    pub stride: Vec<usize>,
-    pub input_op: Option<Box<Op>>,
-    pub requires_grad: bool,
-
-    pub storage: Rc<RefCell<Storage<DtypeVal>>>,
-    pub device: Device,
-    pub layout: Layout,
-    pub dtype: Dtype,
-}
-
-// NB: clones are not expensive because they implement view semantics. the
-//     storage.clone() call is a call to Rc::clone() which simply increments
-//     an internal counter. See Niko Matsakis' early thoughts on making these
-//     cheap clones with a "Claim" trait:
-//     - https://smallcultfollowing.com/babysteps/blog/2024/06/21/claim-auto-and-otherwise/
-//     - https://smallcultfollowing.com/babysteps/blog/2024/06/26/claim-followup-1/
-
-// TODO: detach?
-impl Clone for Tensor {
-    fn clone(&self) -> Self {
-        Self {
-            ndim: self.ndim,
-            shape: self.shape.clone(),
-            stride: self.stride.clone(),
-            input_op: self.input_op.clone(),
-            requires_grad: self.requires_grad,
-            storage: self.storage.clone(),
-            device: self.device.clone(),
-            layout: self.layout.clone(),
-            dtype: self.dtype.clone(),
-        }
-    }
-}
-
-// NB: reference comparison instead of value since f32 is not Eq.
-impl PartialEq for Tensor {
-    fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self, other)
-    }
-}
-
-impl Eq for Tensor {}
-
-impl hash::Hash for Tensor {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        (self as *const Self).hash(state);
-    }
-}
-
-#[derive(Clone)]
-pub struct Storage<DtypeVal> {
-    pub data: Vec<DtypeVal>,
-    pub grad: Option<Tensor>,
-}
-
-// TODO: impl .item() for pythonic pytorch api?
-impl Display for Tensor {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.format(f, &self.shape, &self.stride, 0)
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum ViewOpError {
-    #[error("broadcast mismatch")]
-    BroadcastMismatch,
-    #[error("shape mismatch")]
-    ShapeMismatch,
-    #[error("invalid reshape input")]
-    InvalidReshapeInput,
-    #[error("unknown tensor error")]
-    Unknown,
-}
-
-// *****************************************************************************
-// *************************** CONSTRUCTORS (alloc) ****************************
-// *****************************************************************************
-
-pub fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
-    Tensor {
-        ndim: shape.len(),
-        shape: shape.to_owned(),
-        stride: Tensor::shape_to_stride(shape),
-        input_op: None,
-        requires_grad: false,
-        storage: Rc::new(RefCell::new(Storage { data, grad: None })),
-        device: Device::Cpu,
-        layout: Layout::Strided,
-        dtype: Dtype::Float32,
-    }
-}
-
 impl Tensor {
     pub fn to(&self, d: &Device) -> Self {
         let foo = match d {
             Device::Cpu => todo!(),
             Device::Gpu => todo!(),
-            Device::Cuda => todo!(),
+            Device::Amd => todo!(),
         };
 
         todo!()
     }
 
-    pub fn numel(&self) -> usize {
-        self.shape.iter().product::<usize>()
-    }
+    pub fn numel(&self) -> usize { self.shape.iter().product::<usize>() }
 
     // *************************************************************************
     // *************************** VIEWS (no alloc) ****************************
@@ -569,283 +508,66 @@ impl Tensor {
 
 
 
-use crate::{
-    rsten::{self},
-};
-// use cuda_ops::forward_cuda;
-use std::{
-    ops::{Add, Div, Mul, Neg, Sub},
-};
 
-#[rustfmt::skip]
-#[derive(Clone)]
-pub enum Op {
-    Add(Tensor, Tensor), Sub(Tensor, Tensor), Mul(Tensor, Tensor), Div(Tensor, Tensor), Matmul(Tensor, Tensor), // binops (zip)
-    Neg(Tensor), Exp(Tensor), Log(Tensor), Sinh(Tensor), Cosh(Tensor), Tanh(Tensor), // uops (map)
-    Sum(Tensor, Option<ReduceDimInput>), Max(Tensor, Option<ReduceDimInput>) // reduce
-}
 
-impl Op {
-    pub fn inputs(&self) -> Vec<&Tensor> {
-        // flatten inputs: tup -> vec
-        match self {
-            Op::Add(x, y) | Op::Sub(x, y) | Op::Mul(x, y) | Op::Div(x, y) | Op::Matmul(x, y) => {
-                vec![x, y]
-            }
-            Op::Neg(x)
-            | Op::Exp(x)
-            | Op::Log(x)
-            | Op::Sinh(x)
-            | Op::Cosh(x)
-            | Op::Tanh(x)
-            // | Op::Mean(x) | Op::Var(x)
-            => {
-                vec![x]
-            }
-            Op::Sum(x, _) => vec![x],
-            Op::Max(x, _) => vec![x]
-      }
-    }
-}
+// NB: clones are not expensive because they implement view semantics. the
+//     storage.clone() call is a call to Rc::clone() which simply increments
+//     an internal counter. See Niko Matsakis' early thoughts on making these
+//     cheap clones with a "Claim" trait:
+//     - https://smallcultfollowing.com/babysteps/blog/2024/06/21/claim-auto-and-otherwise/
+//     - https://smallcultfollowing.com/babysteps/blog/2024/06/26/claim-followup-1/
 
-impl Tensor {
-    fn forward(&self, op: &Op) -> Result<Tensor, OpForwardError> {
-        match self.device {
-            Device::Cpu => forward_cpu(op),
-            // Device::Gpu => forward_wgsl(op),
-            // Device::Cuda => forward_cuda(op),
-            _ => unimplemented!("picograd only supports cpu, gpu(opencl) or nv(cuda)"),
+// TODO: detach?
+impl Clone for Tensor {
+    fn clone(&self) -> Self {
+        Self {
+            ndim: self.ndim,
+            shape: self.shape.clone(),
+            stride: self.stride.clone(),
+            input_op: self.input_op.clone(),
+            requires_grad: self.requires_grad,
+            storage: self.storage.clone(),
+            device: self.device.clone(),
+            layout: self.layout.clone(),
+            dtype: self.dtype.clone(),
         }
     }
+}
 
-    pub fn backward(&self) -> () {
-        self.storage.borrow_mut().grad = Some(pyten::ones(self.shape.clone()));
-        self._backward();
-        for tensor in self.topo().iter().rev() {
-            tensor._backward();
-        }
-    }
-
-    fn _backward(&self) -> () {
-        // NB: autodifferentiation's .backward() is defined on Ops, not Tensors.
-        // since the gradient gives us the perturbation sensitivty that a
-        // function's input has on the final loss, it would be clearer mathematically if
-        // .grad lived on Op, not Tensor.
-        if self.input_op.is_none() { return }
-        let op = self.input_op.as_ref().unwrap();
-        let storage_ref = self.storage.borrow(); // lifetime needs to be extended
-        let dfdx_cached = storage_ref.grad.as_ref().unwrap();
-
-        // evaluate local derivatives via chain rule
-        let local_grads = backward_cpu(&op, &self, dfdx_cached);
-
-        // propagate derivative to inputs assuming grads.len() == op.inputs().len()
-        for (x, dfdx_next) in op.inputs().into_iter().zip(local_grads.iter()) {
-            let mut storage = x.storage.borrow_mut();
-            match storage.grad {
-                Some(ref mut dfdx_prev) => *dfdx_prev = (&*dfdx_prev + dfdx_next).unwrap(),
-                None => storage.grad = Some(dfdx_next.clone()),
-            }
-        }
-    }
-
-    fn topo(&self) -> Vec<Tensor> {
-        let (mut output, mut seen) = (Vec::new(), HashSet::new());
-        Self::_visit(self, &mut output, &mut seen);
-        output
-    }
-
-    fn _visit(tensor: &Tensor, output: &mut Vec<Tensor>, seen: &mut HashSet<Tensor>) {
-        if seen.contains(&tensor) { return }
-        seen.insert(tensor.clone());
-        if let Some(ref op) = tensor.input_op {
-            for input in op.inputs() { Self::_visit(input, output, seen) }
-        }
-        output.push(tensor.clone());
+// NB: reference comparison instead of value since f32 is not Eq.
+impl PartialEq for Tensor {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
     }
 }
 
-// dFdx is the global derivative (backpropagated to the current op)
-// dfdx is the local derivative
-pub fn backward_cpu(op: &Op, opout: &Tensor, dFdx: &Tensor) -> Vec<Tensor> {
-    match op {
-        Op::Add(_x, _y) => vec![
-            (1.0 * &dFdx.clone()).unwrap(),
-            (1.0 * &dFdx.clone()).unwrap(),
-        ],
-        Op::Sub(x, y) => todo!(),
-        Op::Mul(x, y) => vec![(y * &dFdx.clone()).unwrap(), (x * &dFdx.clone()).unwrap()],
-        Op::Div(x, y) => todo!(),
-        Op::Matmul(x, y) => todo!(),
-        Op::Neg(x) => todo!(),
-        Op::Exp(x) => todo!(),
-        Op::Log(x) => todo!(),
-        Op::Sinh(x) => todo!(),
-        Op::Cosh(x) => todo!(),
-        Op::Tanh(x) => {
-            // d(tanh)dx: 1-tanh(x)^2
-            let tanh_x = opout;
-            let (ones_tensor, tanh_squared) =
-                (pyten::ones(tanh_x.shape.clone()), (tanh_x * tanh_x).unwrap());
-            let dfdx = (&ones_tensor - &tanh_squared).unwrap();
+impl Eq for Tensor {}
 
-            vec![(&dfdx * &dFdx.clone()).unwrap()] // chain rule
-        }
-        Op::Sum(x, reduce_dim_input) => todo!(),
-        Op::Max(x, reduce_dim_input) => todo!(),
+impl hash::Hash for Tensor {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        (self as *const Self).hash(state);
     }
 }
 
-impl Neg for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn neg(self) -> Self::Output {
-        let op = Op::Neg(self.clone());
-        let output = self.forward(&op);
-        output
+// TODO: impl .item() for pythonic pytorch api?
+impl Display for Tensor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.format(f, &self.shape, &self.stride, 0)
     }
 }
 
-impl Add for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn add(self, rhs: &Tensor) -> Self::Output {
-        let op = Op::Add(self.clone(), rhs.clone());
-        let output = self.forward(&op);
-        output
-    }
+#[derive(Error, Debug)]
+pub enum ViewOpError {
+    #[error("broadcast mismatch")] BroadcastMismatch,
+    #[error("shape mismatch")] ShapeMismatch,
+    #[error("invalid reshape input")] InvalidReshapeInput,
+    #[error("unknown tensor error")] Unknown,
 }
 
-impl Add<f32> for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn add(self, rhs: f32) -> Self::Output {
-        let op = Op::Add(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
-        let output = self.forward(&op);
-        output
-    }
-}
-
-impl Sub for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn sub(self, rhs: &Tensor) -> Self::Output {
-        let op = Op::Sub(self.clone(), rhs.clone());
-        let output = self.forward(&op);
-        output
-    }
-}
-
-impl Sub<f32> for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn sub(self, rhs: f32) -> Self::Output {
-        let op = Op::Sub(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
-        let output = self.forward(&op);
-        output
-    }
-}
-impl Mul for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn mul(self, rhs: &Tensor) -> Self::Output {
-        let op = Op::Mul(self.clone(), rhs.clone());
-        let output = self.forward(&op);
-        output
-    }
-}
-
-impl Mul<f32> for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        let op = Op::Mul(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
-        let output = self.forward(&op);
-        output
-    }
-}
-
-impl Mul<&Tensor> for f32 {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn mul(self, rhs: &Tensor) -> Self::Output {
-        let op = Op::Mul(pyten::new(vec![DtypeVal::Float32(self)]), rhs.clone());
-        let output = rhs.forward(&op);
-        output
-    }
-}
-
-impl Div for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn div(self, rhs: &Tensor) -> Self::Output {
-        let op = Op::Div(self.clone(), rhs.clone());
-        let output = self.forward(&op);
-        output
-    }
-}
-
-impl Div<f32> for &Tensor {
-    type Output = Result<Tensor, OpForwardError>;
-
-    fn div(self, rhs: f32) -> Self::Output {
-        let op = Op::Div(self.clone(), pyten::new(vec![DtypeVal::Float32(rhs)]));
-        let output = self.forward(&op);
-        output
-    }
-}
-// note: picograd operations do not support `out` arg for "return oriented programming"
-
-impl Tensor {
-    // ***transcendental***
-    pub fn exp(&self) -> Result<Tensor, OpForwardError> {
-        let op = Op::Exp(self.clone());
-        let output = self.forward(&op);
-        output
-    }
-
-    pub fn log(&self) -> Result<Tensor, OpForwardError> {
-        let op = Op::Log(self.clone());
-        let output = self.forward(&op);
-        output
-    }
-
-    // ***linear/non-linear***
-    pub fn matmul(&self, other: &Tensor) -> Result<Tensor, OpForwardError> {
-        let op = Op::Matmul(self.clone(), other.clone());
-        let output = self.forward(&op);
-        output
-    }
-
-    pub fn sinh(&self) -> Result<Tensor, OpForwardError> {
-        let op = Op::Sinh(self.clone());
-        let output = self.forward(&op);
-        output
-    }
-
-    pub fn cosh(&self) -> Result<Tensor, OpForwardError> {
-        let op = Op::Cosh(self.clone());
-        let output = self.forward(&op);
-        output
-    }
-
-    pub fn tanh(&self) -> Result<Tensor, OpForwardError> {
-        let op = Op::Tanh(self.clone());
-        let output = self.forward(&op);
-        output
-    }
-
-    // ***reductions***
-    pub fn _sum(&self, rdi: Option<ReduceDimInput>) -> Result<Tensor, OpForwardError> {
-        let op = Op::Sum(self.clone(), rdi);
-        let output = self.forward(&op);
-        output
-    }
-
-    pub fn max(&self, dim: usize, keepdim: bool) -> Result<Tensor, OpForwardError> {
-        let rdi = ReduceDimInput { dim, keepdim };
-        let op = Op::Max(self.clone(), Some(rdi));
-        let output = self.forward(&op);
-        output
+pub fn alloc(shape: &[usize], data: Vec<DtypeVal>) -> Tensor {
+    Tensor {
+        ndim: shape.len(), shape: shape.to_owned(), stride: Tensor::shape_to_stride(shape),
+        input_op: None, requires_grad: false,
+        storage: Rc::new(RefCell::new(Storage { data, grad: None })), device: Device::Cpu, layout: Layout::Strided, dtype: Dtype::Float32,
     }
 }

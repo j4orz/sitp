@@ -1,20 +1,11 @@
-use crate::{
-    pyten::{self}, rsten::{self, Op, Storage, Tensor, ViewOpError}, Dtype, DtypeVal
-};
-use std::{
-    cell::RefCell,
-    cmp,
-    ops::{Add, AddAssign, Div, Mul, Neg, Sub},
-    rc::Rc,
-};
+use crate::{ pyten::{self}, rsten::{self, Op, Storage, Tensor, ViewOpError}, Dtype, DtypeVal };
+use std::{ cell::RefCell, cmp, ops::{Add, AddAssign, Div, Mul, Neg, Sub}, rc::Rc };
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum OpForwardError {
-    #[error(transparent)]
-    TensorError(#[from] ViewOpError),
-    #[error("unknown operation error")]
-    Unknown,
+    #[error(transparent)] TensorError(#[from] ViewOpError),
+    #[error("unknown operation error")] Unknown,
 }
 
 pub fn forward_cpu(op: &Op) -> Result<Tensor, OpForwardError> {

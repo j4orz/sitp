@@ -1,6 +1,6 @@
 use crate::{
     Device, Dtype, DtypeVal, Layout, nn,
-    ops::cpu_ops::{OpForwardError, ReduceDimInput},
+    opscpu::{OpForwardError, ReduceDimInput},
     rsten::{self, Tensor, ViewOpError},
 };
 use numpy::{IntoPyArray, PyArrayMethods, PyUntypedArrayMethods};

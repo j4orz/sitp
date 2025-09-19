@@ -1,4 +1,4 @@
-use crate::{ops::cpu_ops::ReduceDimInput, rsten::Tensor};
+use crate::{opscpu::ReduceDimInput, rsten::Tensor};
 use pyo3::{PyResult, pyfunction};
 use std::ops::{Div, Sub};
 

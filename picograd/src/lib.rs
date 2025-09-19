@@ -1,17 +1,11 @@
 #![allow(non_snake_case)]
 
-pub mod pyten;
-pub mod rsten;
-// pub mod foo;
-pub mod linalg; // cublas
-pub mod nn; // cudnn
-pub mod ops;
-pub mod storage;
-pub mod ir; // tinygrad-style IR Ops and groupings
+pub mod pyten; pub mod rsten; pub mod linalg; pub mod nn;
+pub mod autograd; pub mod opscpu; pub mod opsgpu; // cudnn, cublas
 
 use pyo3::{FromPyObject, IntoPyObject, pyclass};
 
-#[pyclass(eq)] #[derive(Clone, Debug, PartialEq)] pub enum Device { Cpu, Gpu, Cuda, }
+#[pyclass(eq)] #[derive(Clone, Debug, PartialEq)] pub enum Device { Cpu, Gpu, Amd, }
 #[pyclass(eq)] #[derive(Clone, Debug, PartialEq)] pub enum Layout { Strided  } // Sparse, // MklDnn
 #[pyclass(eq)] #[derive(Clone, Debug, PartialEq)] pub enum Dtype { Bool, Float32, Float64, Int32, Int64}
 
