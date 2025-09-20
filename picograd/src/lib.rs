@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
-pub mod pyten; pub mod rsten; pub mod linalg; pub mod nn;
-pub mod autograd; pub mod opscpu; pub mod opsgpu; // cudnn, cublas
+pub mod tensor;
+pub mod autograd;
+pub mod kernels;
 
 use pyo3::{FromPyObject, IntoPyObject, pyclass};
 

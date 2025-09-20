@@ -1,7 +1,7 @@
 use crate::{
-    Device, Dtype, DtypeVal, Layout, nn,
-    opscpu::{OpForwardError, ReduceDimInput},
-    rsten::{self, Tensor, ViewOpError},
+    Device, Dtype, DtypeVal, Layout, tensor::nn,
+    kernels::cpu::{OpForwardError, ReduceDimInput},
+    tensor::rsten::{self, Tensor, ViewOpError},
 };
 use numpy::{IntoPyArray, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::types::PyInt;
@@ -245,9 +245,10 @@ impl Tensor {
     }
 
     fn __mul__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {
-        if let Ok(val) = other.extract::<f32>() { Ok(self.mul(val)?) }
-        else if let Ok(t2) = other.extract::<Tensor>() { Ok(self.mul(&t2)?) }
-        else { Err(PyRuntimeError::new_err("expected a tensor or scalar")) }
+        todo!()
+        // if let Ok(val) = other.extract::<f32>() { Ok(self.mul(val)?) }
+        // else if let Ok(t2) = other.extract::<Tensor>() { Ok(self.mul(&t2)?) }
+        // else { Err(PyRuntimeError::new_err("expected a tensor or scalar")) }
     }
 
     fn __truediv__(&self, other: Bound<'_, PyAny>) -> PyResult<Tensor> {

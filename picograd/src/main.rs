@@ -1,4 +1,4 @@
-use picograd::{pyten, Device};
+use picograd::{tensor::pyten, Device};
 
 #[allow(non_snake_case)]
 fn main() {
@@ -10,6 +10,7 @@ fn main() {
 
     let X = X.to(&device);
     let X = Y.to(&device);
-    let Z = (&X * &Y).unwrap();
-    Z.backward();
+    // let Z = (&X * &Y).unwrap();
+    // Z.backward();
+    todo!()
 }

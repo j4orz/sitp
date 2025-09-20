@@ -1,4 +1,4 @@
-use crate::{opscpu::{forward_cpu, OpForwardError, ReduceDimInput}, pyten, Device, Dtype, DtypeVal, Layout};
+use crate::{kernels::cpu::{forward_cpu, OpForwardError, ReduceDimInput}, tensor::pyten, Device, Dtype, DtypeVal, Layout};
 use std::{ cell::RefCell, cmp::{Ordering, max}, collections::HashSet, fmt::{self, Display}, hash, iter, rc::Rc, ops::{Add, Div, Mul, Neg, Sub} };
 use pyo3::prelude::*;
 use rand::{Rng, distr::Uniform};
